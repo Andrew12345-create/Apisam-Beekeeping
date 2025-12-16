@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apisam Beekeeping - Shop</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="script.js" defer></script>
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <img src="logo.png" alt="Apisam Beekeeping Logo">
+        </div>
+        <div id="navbar-container"></div>
+    </header>
+
+    <main>
+        <section class="shop">
+            <h1>Shop Our Beekeeping Products</h1>
+            <div class="products">
+                <div class="product" data-id="1" data-name="Bee Suit" data-price="89.99">
+                    <h2>Bee Suit</h2>
+                    <p>Protective suit for beekeepers. Made from durable material with veil and gloves.</p>
+                    <p class="price">$89.99</p>
+                    <button class="add-to-cart">Add to Cart</button>
+                </div>
+                <div class="product" data-id="2" data-name="Bee Hive" data-price="149.99">
+                    <h2>Bee Hive</h2>
+                    <p>Complete hive setup for 10 frames. Includes hive body, bottom board, and inner cover.</p>
+                    <p class="price">$149.99</p>
+                    <button class="add-to-cart">Add to Cart</button>
+                </div>
+                <div class="product" data-id="3" data-name="Smoker" data-price="39.99">
+                    <h2>Smoker</h2>
+                    <p>Essential tool for calming bees during inspections. Stainless steel construction.</p>
+                    <p class="price">$39.99</p>
+                    <button class="add-to-cart">Add to Cart</button>
+                </div>
+                <div class="product" data-id="4" data-name="Hive Tool" data-price="19.99">
+                    <h2>Hive Tool</h2>
+                    <p>Multi-purpose tool for prying frames and scraping wax. Stainless steel blade.</p>
+                    <p class="price">$19.99</p>
+                    <button class="add-to-cart">Add to Cart</button>
+                </div>
+            </div>
+        </section>
+
+        <aside class="cart">
+            <h2>Shopping Cart</h2>
+            <div id="cart-items"></div>
+            <div class="cart-total">
+                <strong>Total: $<span id="cart-total">0.00</span></strong>
+            </div>
+            <button id="checkout-btn">Checkout</button>
+        </aside>
+    </main>
+
+    <footer>
+        <p>&copy; 2023 Apisam Beekeeping. All rights reserved.</p>
+    </footer>
+</body>
+</html>
