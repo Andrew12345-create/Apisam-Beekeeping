@@ -84,10 +84,17 @@ header:hover {
 nav ul {
     list-style: none;
     display: flex;
+    gap: 2rem;
+    padding: 0;
+    margin: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
 }
 
 nav ul li {
-    margin-left: 2rem;
+    margin: 0;
+    display: flex;
 }
 
 nav ul li a {
@@ -861,9 +868,12 @@ footer::before {
         margin-top: 1rem;
     }
 
+    nav ul {
+        gap: 1rem;
+    }
+
     nav ul li {
-        margin-left: 1rem;
-        margin-right: 1rem;
+        margin: 0;
     }
 
     main {
