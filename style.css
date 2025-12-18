@@ -476,6 +476,32 @@ main {
     60% { transform: translateY(-3px); }
 }
 
+/* Stock info styles */
+.stock-info {
+    background: rgba(243, 156, 18, 0.1);
+    padding: 0.5rem;
+    border-radius: 8px;
+    margin: 0.5rem 0;
+    border-left: 3px solid #f39c12;
+    font-size: 0.9rem;
+}
+
+.stock-info .in-stock {
+    color: #27ae60;
+    font-weight: 600;
+}
+
+.stock-info .low-stock {
+    color: #e74c3c;
+    font-weight: 600;
+    animation: pulse-warning 2s infinite;
+}
+
+@keyframes pulse-warning {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
 .product button, .add-to-cart, .quantity-button {
     background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
     color: #f39c12;
@@ -1065,6 +1091,70 @@ button[onclick*="showPermissionsForm"] {
 
 #admin-forms input[type="checkbox"] {
     width: auto;
+}
+
+/* Stock Management Styles */
+.products-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+    font-size: 0.9rem;
+}
+
+.products-table thead th {
+    text-align: left;
+    padding: 0.75rem;
+    background: linear-gradient(90deg, #f39c12, #e67e22);
+    color: #fff;
+    font-weight: 600;
+    border-bottom: 2px solid rgba(0,0,0,0.1);
+}
+
+.products-table tbody td {
+    padding: 0.75rem;
+    border-bottom: 1px solid #eee;
+    vertical-align: middle;
+}
+
+.products-table tbody tr:hover {
+    background: rgba(243,156,18,0.05);
+}
+
+.low-stock {
+    background-color: #ffebee !important;
+}
+
+.low-stock .stock-quantity {
+    color: #d32f2f;
+    font-weight: bold;
+}
+
+.normal-stock .stock-quantity {
+    color: #388e3c;
+    font-weight: bold;
+}
+
+.stock-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.stock-controls button, .stock-controls select {
+    padding: 0.5rem 1rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.stock-controls button {
+    background: #007bff;
+    color: white;
+    border: none;
+}
+
+.stock-controls button:hover {
+    background: #0056b3;
 }
 
 /* Floating cart button */

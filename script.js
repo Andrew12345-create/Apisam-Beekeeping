@@ -194,10 +194,28 @@ let currentUser = JSON.parse(localStorage.getItem('currentUser')) || null;
 let __handlingSubmit = false;
 
 const API_PORT = 3000;
-const API_BASE = (location.port && String(location.port) !== String(API_PORT))
-    ? `${location.protocol}//${location.hostname}:${API_PORT}`
-    : '';
+let API_BASE = '';
+// If the page is opened via file:// or there's no port, point API requests at localhost:3000
+if (location.protocol === 'file:' || !location.port) {
+    API_BASE = `http://localhost:${API_PORT}`;
+} else if (String(location.port) !== String(API_PORT)) {
+    API_BASE = `${location.protocol}//${location.hostname}:${API_PORT}`;
+} else {
+    API_BASE = '';
+}
+console.log('apiUrl base:', API_BASE);
 function apiUrl(path) { return API_BASE + path; }
+
+// Utility to escape HTML for safe insertion
+function escapeHtml(str) {
+    if (!str && str !== 0) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
 
 function updateNavigation() {
     const navUl = document.querySelector('nav ul');
@@ -212,6 +230,10 @@ function updateNavigation() {
         const profileLi = document.createElement('li');
         profileLi.innerHTML = '<a href="profile.html">Profile</a>';
         navUl.appendChild(profileLi);
+        
+        const logoutLi = document.createElement('li');
+        logoutLi.innerHTML = '<a href="#" onclick="logout()">Logout</a>';
+        navUl.appendChild(logoutLi);
     } else {
         const loginLi = document.createElement('li');
         loginLi.innerHTML = '<a href="login.html">Login</a>';
@@ -275,19 +297,30 @@ async function updateUserInterface() {
         }
     }
 
-    if (adminContent) {
-        if (currentUser && currentUser.isAdmin) {
-            adminContent.innerHTML = `<h2>Admin Controls</h2><div id="admin-users"></div>`;
-            loadAdminUsers();
-        } else {
-            adminContent.innerHTML = '<p>Please login as admin to access the dashboard.</p>';
+    const adminUsersDiv = document.getElementById('admin-users');
+    // If we have an authenticated admin, load admin users
+    if (adminUsersDiv && currentUser && currentUser.isAdmin) {
+        loadAdminUsers();
+    }
+
+    // Always attempt to load admin stock table when on the admin page
+    if (window.location.pathname.includes('admin.html')) {
+        const productsTable = document.getElementById('products-table');
+        if (productsTable) {
+            // small delay to allow DOM to stabilise
+            setTimeout(loadProducts, 500);
+        }
+        // If we have a token but user info wasn't available earlier, try loading users too
+        if (adminUsersDiv && token && !currentUser) {
+            setTimeout(loadAdminUsers, 700);
         }
     }
     }
 
 async function login(email, password) {
     try {
-        const res = await fetch(apiUrl('/api/login'), { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ email, password }) });
+        const payload = { email: String(email).trim(), password };
+        const res = await fetch(apiUrl('/api/login'), { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
         if (res.ok) {
             const data = await res.json();
             token = data.token;
@@ -349,7 +382,15 @@ async function signup(name,email,password) {
     }
 }
 
-function logout() { currentUser = null; localStorage.removeItem('currentUser'); localStorage.removeItem('token'); updateUserInterface(); window.location.href='index.html'; }
+function logout() { 
+    currentUser = null; 
+    token = null;
+    sessionStorage.removeItem('currentUser'); 
+    sessionStorage.removeItem('token'); 
+    localStorage.removeItem('adminSession');
+    updateNavigation();
+    window.location.href='index.html'; 
+}
 
 // Delegated submit listener to ensure signup/profile are intercepted even if specific handlers aren't attached
 document.addEventListener('submit', async function(e) {
@@ -461,10 +502,110 @@ function createFloatingCartButton() {
     console.log('Floating cart button created');
 }
 
+// Shop products loading
+async function loadShopProducts() {
+    try {
+        // Test server connectivity first
+        console.log('Testing server connectivity...');
+        const testRes = await fetch(apiUrl('/api/test'));
+        if (!testRes.ok) {
+            throw new Error('Server not responding');
+        }
+        console.log('Server is responding');
+        
+        // Now fetch products
+        console.log('Fetching products from:', apiUrl('/api/products/full'));
+        const res = await fetch(apiUrl('/api/products/full'));
+        if (res.ok) {
+            const data = await res.json();
+            console.log('Database products received:', data.products?.length || 0, 'products');
+            if (data.products && data.products.length > 0) {
+                console.log('First product:', data.products[0]);
+                displayShopProducts(data.products);
+            } else {
+                document.getElementById('shop-products').innerHTML = 'No products found in database';
+            }
+        } else {
+            console.error('Failed to fetch products:', res.status, res.statusText);
+            document.getElementById('shop-products').innerHTML = `Error loading products: ${res.status}`;
+        }
+    } catch (err) {
+        console.error('Error loading products:', err);
+        document.getElementById('shop-products').innerHTML = `Error: ${err.message}`;
+    }
+}
+
+function displayShopProducts(products) {
+    const categories = {
+        'Hives & Equipment': '🏠',
+        'Hive Components': '🔧',
+        'Protective Equipment': '🛡️',
+        'Tools & Equipment': '🔨',
+        'Honey Processing': '🍯',
+        'Storage & Containers': '📦',
+        'Specialty Items': '✨'
+    };
+    
+    const groupedProducts = products.reduce((acc, product) => {
+        if (!acc[product.category]) acc[product.category] = [];
+        acc[product.category].push(product);
+        return acc;
+    }, {});
+    
+    const shopHTML = Object.entries(groupedProducts).map(([category, categoryProducts]) => {
+        const icon = categories[category] || '📦';
+        const productsHTML = categoryProducts.map(product => {
+            const minStock = product.min_stock_level || 5;
+            const stockClass = product.stock_quantity <= minStock ? 'low-stock' : 'in-stock';
+            const originalPrice = product.original_price ? `<span style="text-decoration: line-through; color: #999;">KSH ${product.original_price.toLocaleString()}</span> ` : '';
+            const imageHTML = product.image_url ? `<img src="${product.image_url}" alt="${product.name}">` : '';
+            
+            return `
+                <div class="product" data-id="${product.id}" data-name="${product.name}" data-price="${product.price}">
+                    ${imageHTML}
+                    <h2>${product.name}</h2>
+                    <p>${product.description}</p>
+                    <p class="stock-info"><strong>Stock Info:</strong> <span class="${stockClass}">${product.stock_quantity || 0} available</span></p>
+                    <p class="price">${originalPrice}<strong>KSH ${product.price.toLocaleString()}</strong></p>
+                    <button class="add-to-cart">Add to Cart</button>
+                </div>
+            `;
+        }).join('');
+        
+        return `
+            <div class="category">
+                <h2 class="category-title">${icon} ${category}</h2>
+                <div class="products">${productsHTML}</div>
+            </div>
+        `;
+    }).join('');
+    
+    document.getElementById('shop-products').innerHTML = shopHTML;
+    
+    // Bind add-to-cart buttons
+    document.querySelectorAll('.add-to-cart').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const product = this.closest('.product');
+            if (product) {
+                addToCart(product.dataset.id, product.dataset.name, product.dataset.price);
+            }
+        });
+    });
+    
+    updateProductButtons();
+}
+
 // Other DOM handlers and initializers
 document.addEventListener('DOMContentLoaded', function() {
+    // Load user from sessionStorage
+    token = sessionStorage.getItem('token');
+    const savedUser = sessionStorage.getItem('currentUser');
+    if (savedUser) {
+        currentUser = JSON.parse(savedUser);
+    }
+    
     // Load navbar and initialize UI
-    loadNavbar(); updateCartDisplay(); updateUserInterface();
+    loadNavbar(); updateCartDisplay(); updateNavigation();
     
     // Create cart sidebar and floating button
     createCartSidebar();
@@ -473,12 +614,33 @@ document.addEventListener('DOMContentLoaded', function() {
     // Start ban checking if user is logged in
     if (currentUser && token) startBanCheck();
 
+    // Load products on shop page
+    if (window.location.pathname.includes('shop.html')) {
+        setTimeout(loadShopProducts, 500);
+    }
+    
+    // Check admin access on admin page
+    if (window.location.pathname.includes('admin.html')) {
+        setTimeout(checkAdminAccess, 500);
+    }
+
     // Bind add-to-cart buttons (products may be present statically)
     document.querySelectorAll('.add-to-cart').forEach(btn => btn.addEventListener('click', function() {
         const product = this.closest('.product');
         if (!product) return;
         addToCart(product.dataset.id, product.dataset.name, product.dataset.price);
     }));
+    
+    // Load products on admin page
+    if (window.location.pathname.includes('admin.html')) {
+        // initialize admin auth portal
+        initAdminAuthPortal();
+        // If already authenticated as admin, load products and users
+        if (currentUser && currentUser.isAdmin) {
+            setTimeout(() => { if (document.getElementById('products-table')) loadProducts(); }, 1000);
+            if (document.getElementById('admin-users')) setTimeout(loadAdminUsers, 1000);
+        }
+    }
 
     const checkoutBtn = document.getElementById('checkout-btn');
     const checkoutBtnPage = document.getElementById('checkout-btn-page');
@@ -499,15 +661,19 @@ document.addEventListener('DOMContentLoaded', function() {
             if (__handlingSubmit) return;
             __handlingSubmit = true;
             try {
-                const email = document.getElementById('login-email').value;
+                const email = document.getElementById('login-email').value.trim();
                 const password = document.getElementById('login-password').value;
-                const ok = await login(email, password);
+                const res = await fetch(apiUrl('/api/login'), { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ email, password }) });
                 const msgEl = document.getElementById('login-message');
-                if (ok) {
-                    msgEl.textContent = 'Login successful!'; msgEl.style.color = 'green'; updateUserInterface();
-                    if (currentUser && currentUser.lastLogin) msgEl.textContent += ` Last login: ${new Date(currentUser.lastLogin).toLocaleString()}`;
-                    startBanCheck(); // Start monitoring for bans
-                    setTimeout(() => window.location.href = 'profile.html', 1000);
+                if (res.ok) {
+                    const data = await res.json();
+                    token = data.token;
+                    currentUser = data.user;
+                    sessionStorage.setItem('token', token);
+                    sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    msgEl.textContent = 'Login successful!'; msgEl.style.color = 'green';
+                    updateNavigation();
+                    setTimeout(() => window.location.href = 'shop.html', 1000);
                 } else {
                     // Do not overwrite server-provided message; login() already sets messages on failure.
                     if (msgEl && !msgEl.textContent) {
@@ -538,25 +704,148 @@ document.addEventListener('DOMContentLoaded', function() {
 // Admin helpers
 let isSuperAdmin = false;
 
+// Show admin auth portal when admin page loads
+function initAdminAuthPortal() {
+    const checkEl = document.getElementById('admin-auth-check');
+    const formEl = document.getElementById('admin-auth-form');
+    const adminContent = document.getElementById('admin-content');
+    if (!checkEl || !formEl) return;
+    // Block admin content while checking
+    if (adminContent) adminContent.style.display = 'none';
+    // Simulate checking state then show form (or skip if already authenticated)
+    checkEl.textContent = 'CHECKING IF YOU ARE ADMIN...';
+    // If already authenticated and admin, show content immediately
+    if (currentUser) {
+        if (currentUser.isAdmin) {
+            if (adminContent) adminContent.style.display = 'block';
+            document.getElementById('admin-auth-portal').style.display = 'none';
+            return;
+        }
+        // Logged-in user is not an admin: deny entry without showing password form
+        checkEl.textContent = 'Access denied — your account is not an admin.';
+        formEl.style.display = 'none';
+        return;
+    }
+
+    // Not logged in: show verification form after brief check
+    setTimeout(() => {
+        checkEl.textContent = 'Please verify credentials to continue';
+        formEl.style.display = 'block';
+    }, 800);
+}
+
+async function submitAdminAuth() {
+    const email = document.getElementById('admin-auth-email').value.trim();
+    const password = document.getElementById('admin-auth-password').value;
+    const msgEl = document.getElementById('admin-auth-message');
+    if (!email || !password) { if (msgEl) msgEl.textContent = 'Please provide both email and password'; return; }
+    if (msgEl) { msgEl.style.color = '#333'; msgEl.textContent = 'Verifying...'; }
+
+    try {
+        const res = await fetch(apiUrl('/api/admin/authenticate'), {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password })
+        });
+        if (!res.ok) {
+            const body = await res.json().catch(()=>({}));
+            if (msgEl) { msgEl.style.color = '#c00'; msgEl.textContent = body.message || `Verification failed (${res.status})`; }
+            console.error('Admin auth failed', res.status, body);
+            return;
+        }
+        const data = await res.json();
+        // store token and currentUser
+        token = data.token;
+        currentUser = data.user;
+        localStorage.setItem('token', token);
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        if (msgEl) { msgEl.style.color = 'green'; msgEl.textContent = 'Verified — loading admin data...'; }
+        // hide portal and reveal admin content
+        const portal = document.getElementById('admin-auth-portal');
+        const adminContent = document.getElementById('admin-content');
+        if (portal) portal.style.display = 'none';
+        if (adminContent) adminContent.style.display = 'block';
+        // load admin UI
+        updateUserInterface();
+        setTimeout(() => { loadAdminUsers(); loadProducts(); }, 300);
+    } catch (err) {
+        if (msgEl) { msgEl.style.color = '#c00'; msgEl.textContent = 'Network error during verification'; }
+        console.error('Admin auth error', err);
+    }
+}
+
 async function loadAdminUsers() {
     const container = document.getElementById('admin-users');
+        console.log('loadAdminUsers(): triggered — attempting to fetch admin users');
     if (!container) return;
     container.textContent = 'Loading users...';
+    // show a helpful hint if loading stalls
+    const stallTimer = setTimeout(() => {
+        try {
+            if (container && container.textContent && container.textContent.includes('Loading')) {
+                container.textContent = 'Still loading users — please ensure you are logged in as an admin or check the browser console for errors.';
+            }
+        } catch (e) { /* ignore */ }
+    }, 5000);
+
     try {
+        // If we have a token but no currentUser info, try refreshing profile first
         if (!token) {
+            clearTimeout(stallTimer);
             container.textContent = 'Not authenticated. Please login as an admin.';
             return;
         }
 
+        if (token && !currentUser) {
+            try {
+                const p = await fetch(apiUrl('/api/profile'), { headers: { 'Authorization': `Bearer ${token}` } });
+                if (p.ok) {
+                    const payload = await p.json();
+                    currentUser = payload.user;
+                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                } else {
+                    // token invalid -> clear and ask to login
+                    clearTimeout(stallTimer);
+                    localStorage.removeItem('token');
+                    token = null;
+                    container.textContent = 'Not authenticated. Please login as an admin.';
+                    return;
+                }
+            } catch (e) {
+                console.warn('Profile refresh failed before loading admin users', e);
+            }
+        }
+
         const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
         const res = await fetch(apiUrl('/api/admin/users'), { headers });
+
         if (!res.ok) {
-            let msg = `Unable to load users (status ${res.status})`;
-            try { const body = await res.json(); if (body && body.message) msg += `: ${body.message}`; } catch (e) { /* ignore */ }
-            container.textContent = msg;
+            // Read response body (try JSON, fallback to text)
+            let bodyText = '';
+            try {
+                const json = await res.json().catch(() => null);
+                if (json) bodyText = JSON.stringify(json);
+                else bodyText = await res.text().catch(() => '');
+            } catch (e) {
+                bodyText = '(could not read response body)';
+            }
+
+            console.error('Admin users fetch failed', { status: res.status, statusText: res.statusText, body: bodyText });
+            clearTimeout(stallTimer);
+
+            // Handle auth issues specifically
+            if (res.status === 401 || res.status === 403) {
+                const msg = bodyText || 'Not authenticated. Please login as an admin.';
+                container.innerHTML = `<div class="admin-error">${escapeHtml(msg)}</div>`;
+                return;
+            }
+
+            // Generic server error
+            container.innerHTML = `<div class="admin-error">Unable to load users (status ${res.status})<br><pre style="white-space:pre-wrap">${escapeHtml(bodyText)}</pre></div>`;
             return;
         }
+
         const data = await res.json();
+        console.log('loadAdminUsers(): server returned', Array.isArray(data.users) ? data.users.length : '(no users array)', 'users');
+        if (Array.isArray(data.users)) console.log('User emails:', data.users.map(u=>u.email).slice(0,50));
         isSuperAdmin = data.currentUser?.isSuperAdmin || false;
         
         // Show create admin button for super admin
@@ -587,6 +876,7 @@ async function loadAdminUsers() {
             `;
         }).join('');
         
+        clearTimeout(stallTimer);
         container.innerHTML = `
             <table class="admin-users-table">
                 <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Last Login</th><th>Admin</th><th>Status</th><th>Permissions</th><th>Actions</th></tr></thead>
@@ -753,4 +1043,257 @@ async function setPermissions(event) {
     }
 }
 
+// Stock Management Functions
+async function loadProducts() {
+    const container = document.getElementById('products-table');
+    if (!container) return;
+    
+    container.innerHTML = 'Loading products...';
+    
+    try {
+        const res = await fetch(apiUrl('/api/admin/products'), {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        // If admin endpoint requires auth and we don't have it, fall back to public products
+        let data;
+        if (!res.ok && (res.status === 401 || res.status === 403)) {
+            const publicRes = await fetch(apiUrl('/api/products'));
+            if (!publicRes.ok) {
+                container.innerHTML = 'Failed to load products';
+                return;
+            }
+            data = await publicRes.json();
+        } else {
+            if (!res.ok) {
+                container.innerHTML = 'Failed to load products';
+                return;
+            }
+            data = await res.json();
+        }
+
+        displayProducts(data.products);
+    } catch (err) {
+        console.error('Load products error:', err);
+        container.innerHTML = 'Error loading products';
+    }
+}
+
+function displayProducts(products) {
+    const container = document.getElementById('products-table');
+    
+    const rows = products.map(p => {
+        const stockStatus = p.stock_quantity <= p.min_stock_level ? 'low-stock' : 'normal-stock';
+        const originalPrice = p.original_price ? `<span style="text-decoration: line-through;">KSH ${p.original_price}</span>` : '';
+        
+        return `
+            <tr class="${stockStatus}" data-category="${p.category}">
+                <td>${p.id}</td>
+                <td>${p.name}</td>
+                <td>${p.category}</td>
+                <td>${originalPrice} <strong>KSH ${p.price}</strong></td>
+                <td class="stock-quantity">${p.stock_quantity}</td>
+                <td>${p.min_stock_level}</td>
+                <td>
+                    <button onclick="showStockForm(${p.id}, '${p.name}', ${p.stock_quantity})">Update Stock</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+    
+    container.innerHTML = `
+        <table class="products-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Product Name</th>
+                    <th>Category</th>
+                    <th>Price</th>
+                    <th>Stock</th>
+                    <th>Min Level</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+    `;
+}
+
+function filterProducts() {
+    const filter = document.getElementById('category-filter').value;
+    const rows = document.querySelectorAll('.products-table tbody tr');
+    
+    rows.forEach(row => {
+        const category = row.dataset.category;
+        row.style.display = !filter || category === filter ? '' : 'none';
+    });
+}
+
+function showStockForm(productId, productName, currentStock) {
+    document.getElementById('update-product-id').value = productId;
+    document.getElementById('update-product-name').textContent = productName;
+    document.getElementById('update-quantity').value = currentStock;
+    document.getElementById('stock-update-form').style.display = 'block';
+}
+
+function hideStockForm() {
+    document.getElementById('stock-update-form').style.display = 'none';
+}
+
+async function updateStock(event) {
+    event.preventDefault();
+    
+    const productId = document.getElementById('update-product-id').value;
+    const quantity = document.getElementById('update-quantity').value;
+    const reason = document.getElementById('update-reason').value;
+    
+    try {
+        const res = await fetch(apiUrl(`/api/admin/products/${productId}/stock`), {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ quantity: parseInt(quantity), reason })
+        });
+        
+        if (res.ok) {
+            alert('Stock updated successfully!');
+            hideStockForm();
+            loadProducts();
+        } else {
+            const error = await res.json();
+            alert(`Failed to update stock: ${error.message}`);
+        }
+    } catch (err) {
+        console.error('Update stock error:', err);
+        alert('Error updating stock');
+    }
+}
+
 function addProduct() { const name = prompt('Product name:'); const price = prompt('Product price:'); if (name && price) alert('Product added (simulated)'); }
+
+// Admin session management
+let timerInterval;
+
+function setAdminSession() {
+    console.log('Setting admin session');
+    const expiry = Date.now() + (10 * 60 * 1000); // 10 minutes
+    localStorage.setItem('adminSession', expiry.toString());
+    console.log('Session set, starting timer');
+    startTimer();
+}
+
+function checkAdminSession() {
+    const session = localStorage.getItem('adminSession');
+    if (!session) return false;
+    return Date.now() < parseInt(session);
+}
+
+function clearAdminSession() {
+    localStorage.removeItem('adminSession');
+    if (timerInterval) clearInterval(timerInterval);
+}
+
+function startTimer() {
+    console.log('Starting admin timer');
+    if (timerInterval) clearInterval(timerInterval);
+    
+    function updateTimer() {
+        const session = localStorage.getItem('adminSession');
+        const timerEl = document.getElementById('admin-timer');
+        
+        console.log('Timer update - session:', session, 'element:', timerEl);
+        
+        if (!session) {
+            console.log('No session found');
+            if (timerEl) timerEl.textContent = 'No session';
+            return;
+        }
+        
+        if (!timerEl) {
+            console.log('Timer element not found');
+            return;
+        }
+        
+        const remaining = parseInt(session) - Date.now();
+        if (remaining <= 0) {
+            clearAdminSession();
+            timerEl.textContent = 'Session expired';
+            setTimeout(() => location.reload(), 2000);
+            return;
+        }
+        
+        const minutes = Math.floor(remaining / 60000);
+        const seconds = Math.floor((remaining % 60000) / 1000);
+        const timeText = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        timerEl.textContent = timeText;
+        console.log('Timer updated to:', timeText);
+    }
+    
+    updateTimer(); // Update immediately
+    timerInterval = setInterval(updateTimer, 1000);
+}
+
+// Admin authentication functions
+async function submitAdminAuth() {
+    console.log('submitAdminAuth called');
+    const email = document.getElementById('admin-auth-email').value;
+    const password = document.getElementById('admin-auth-password').value;
+    
+    try {
+        const res = await fetch(apiUrl('/api/admin/authenticate'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+        
+        if (res.ok) {
+            setAdminSession();
+            document.getElementById('admin-auth-portal').style.display = 'none';
+            
+            // Create timer immediately
+            const timer = document.createElement('div');
+            timer.id = 'admin-timer';
+            timer.style.cssText = 'position:fixed !important;top:20px !important;right:20px !important;background:red !important;color:white !important;padding:20px !important;border-radius:8px !important;font-weight:bold !important;z-index:99999 !important;font-size:18px !important;';
+            timer.textContent = 'TIMER HERE';
+            document.body.appendChild(timer);
+            alert('Timer created!');
+            
+            loadAdminUsers();
+            loadProducts();
+        } else {
+            const error = await res.json().catch(() => ({}));
+            document.getElementById('admin-auth-message').textContent = error.message || 'Authentication failed';
+        }
+    } catch (err) {
+        document.getElementById('admin-auth-message').textContent = 'Authentication error';
+    }
+}
+
+// Check if current user is admin on page load
+async function checkAdminAccess() {
+    if (!currentUser) {
+        document.getElementById('admin-auth-check').textContent = 'Please login first';
+        setTimeout(() => window.location.href = 'login.html', 2000);
+        return;
+    }
+    
+    if (!currentUser.isAdmin) {
+        document.getElementById('admin-auth-check').textContent = 'Access denied - not an admin account';
+        setTimeout(() => window.location.href = 'index.html', 2000);
+        return;
+    }
+    
+    // Check if admin session is still valid
+    if (checkAdminSession()) {
+        document.getElementById('admin-auth-portal').style.display = 'none';
+        startTimer();
+        loadAdminUsers();
+        loadProducts();
+        return;
+    }
+    
+    document.getElementById('admin-auth-check').style.display = 'none';
+    document.getElementById('admin-auth-form').style.display = 'block';
+}

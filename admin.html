@@ -17,12 +17,27 @@
 
     <main>
         <section class="admin">
-            <h1>Admin Dashboard</h1>
+            <h1>Admin Dashboard <span id="admin-timer" style="float:right;font-size:0.8em;color:#f39c12;background:rgba(0,0,0,0.1);padding:5px 10px;border-radius:5px;"></span></h1>
+            <div id="admin-auth-portal" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.55);z-index:9999;">
+                <div style="background:#fff;padding:20px;border-radius:8px;max-width:420px;width:100%;box-shadow:0 8px 24px rgba(0,0,0,0.4);">
+                    <div id="admin-auth-check" style="font-weight:700;margin-bottom:8px;">CHECKING IF YOU ARE ADMIN...</div>
+                    <div id="admin-auth-form" style="display:none; margin-top:6px;">
+                        <p>Please enter your admin email and password to proceed.</p>
+                        <form id="admin-auth" onsubmit="event.preventDefault(); submitAdminAuth();">
+                            <input type="email" id="admin-auth-email" placeholder="Admin email" required style="display:block; margin-bottom:8px; width:100%; padding:8px;">
+                            <input type="password" id="admin-auth-password" placeholder="Admin password" required style="display:block; margin-bottom:8px; width:100%; padding:8px;">
+                            <div style="display:flex;gap:8px;align-items:center;"><button type="submit">Verify</button></div>
+                            <div id="admin-auth-message" style="margin-top:8px;color:#c00;"></div>
+                        </form>
+                    </div>
+                </div>
+            </div>
             <div id="admin-content" class="admin-content">
                 <div class="admin-panel">
                     <h2>User Management</h2>
                     <div id="admin-controls" style="margin-bottom: 20px;">
                         <button id="create-admin-btn" onclick="showCreateAdminForm()" style="display:none;">Create Admin</button>
+                        <button id="refresh-users-btn" onclick="loadAdminUsers()" style="margin-left:8px;">Refresh Users</button>
                     </div>
                     <div id="admin-users">
                         <p>Loading users...</p>
@@ -82,7 +97,41 @@
                 <div class="admin-panel">
                     <h2>Stock Management</h2>
                     <div id="admin-stock-panel">
-                        <!-- Stock panel intentionally left blank -->
+                        <div class="stock-controls" style="margin-bottom: 20px;">
+                            <button onclick="loadProducts()">Refresh Stock</button>
+                            <select id="category-filter" onchange="filterProducts()">
+                                <option value="">All Categories</option>
+                                <option value="Hives & Equipment">Hives & Equipment</option>
+                                <option value="Hive Components">Hive Components</option>
+                                <option value="Protective Equipment">Protective Equipment</option>
+                                <option value="Tools & Equipment">Tools & Equipment</option>
+                                <option value="Honey Processing">Honey Processing</option>
+                                <option value="Storage & Containers">Storage & Containers</option>
+                                <option value="Specialty Items">Specialty Items</option>
+                            </select>
+                        </div>
+                        <div id="products-table"></div>
+                        
+                        <!-- Stock Update Form -->
+                        <div id="stock-update-form" style="display:none; margin-top:20px; padding:15px; border:1px solid #ddd;">
+                            <h3>Update Stock</h3>
+                            <form onsubmit="updateStock(event)">
+                                <input type="hidden" id="update-product-id">
+                                <div>
+                                    <label>Product: <span id="update-product-name"></span></label>
+                                </div>
+                                <div>
+                                    <label>New Stock Quantity:</label>
+                                    <input type="number" id="update-quantity" min="0" required>
+                                </div>
+                                <div>
+                                    <label>Reason:</label>
+                                    <input type="text" id="update-reason" placeholder="Stock adjustment reason" required>
+                                </div>
+                                <button type="submit">Update Stock</button>
+                                <button type="button" onclick="hideStockForm()">Cancel</button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </div>
