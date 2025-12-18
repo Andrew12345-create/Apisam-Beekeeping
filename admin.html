@@ -21,10 +21,64 @@
             <div id="admin-content" class="admin-content">
                 <div class="admin-panel">
                     <h2>User Management</h2>
+                    <div id="admin-controls" style="margin-bottom: 20px;">
+                        <button id="create-admin-btn" onclick="showCreateAdminForm()" style="display:none;">Create Admin</button>
+                    </div>
                     <div id="admin-users">
                         <p>Loading users...</p>
                     </div>
                 </div>
+                
+                <div class="admin-panel">
+                    <h2>Admin Actions</h2>
+                    <div id="admin-forms">
+                        <!-- Create Admin Form -->
+                        <div id="create-admin-form" style="display:none; margin-bottom:20px; padding:15px; border:1px solid #ddd;">
+                            <h3>Create New Admin</h3>
+                            <form onsubmit="createAdmin(event)">
+                                <input type="text" id="admin-name" placeholder="Full Name" required>
+                                <input type="email" id="admin-email" placeholder="Email" required>
+                                <input type="password" id="admin-password" placeholder="Password" required>
+                                <div>
+                                    <label>Permissions:</label>
+                                    <label><input type="checkbox" value="user_management"> User Management</label>
+                                    <label><input type="checkbox" value="ban_users"> Ban Users</label>
+                                    <label><input type="checkbox" value="stock_management"> Stock Management</label>
+                                </div>
+                                <button type="submit">Create Admin</button>
+                                <button type="button" onclick="hideCreateAdminForm()">Cancel</button>
+                            </form>
+                        </div>
+                        
+                        <!-- Ban User Form -->
+                        <div id="ban-user-form" style="display:none; margin-bottom:20px; padding:15px; border:1px solid #ddd;">
+                            <h3>Ban User</h3>
+                            <form onsubmit="banUser(event)">
+                                <input type="hidden" id="ban-user-id">
+                                <input type="number" id="ban-duration" placeholder="Duration (minutes, leave empty for permanent)">
+                                <input type="text" id="ban-reason" placeholder="Reason for ban" required>
+                                <button type="submit">Ban User</button>
+                                <button type="button" onclick="hideBanForm()">Cancel</button>
+                            </form>
+                        </div>
+                        
+                        <!-- Permissions Form -->
+                        <div id="permissions-form" style="display:none; margin-bottom:20px; padding:15px; border:1px solid #ddd;">
+                            <h3>Set Permissions</h3>
+                            <form onsubmit="setPermissions(event)">
+                                <input type="hidden" id="permissions-user-id">
+                                <div id="permissions-checkboxes">
+                                    <label><input type="checkbox" value="user_management"> User Management</label>
+                                    <label><input type="checkbox" value="ban_users"> Ban Users</label>
+                                    <label><input type="checkbox" value="stock_management"> Stock Management</label>
+                                </div>
+                                <button type="submit">Update Permissions</button>
+                                <button type="button" onclick="hidePermissionsForm()">Cancel</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
                 <div class="admin-panel">
                     <h2>Stock Management</h2>
                     <div id="admin-stock-panel">

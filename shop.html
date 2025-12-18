@@ -18,6 +18,7 @@
                 <li><a href="shop.html">Shop</a></li>
                 <li><a href="about.html">About</a></li>
                 <li><a href="contact.html">Contact</a></li>
+                <li><a href="cart.html" id="cart-nav-link">Cart (<span id="cart-count">0</span>)</a></li>
                 <li><a href="login.html">Login</a></li>
                 <li><a href="signup.html">Sign Up</a></li>
             </ul>
@@ -27,42 +28,236 @@
     <main>
         <section class="shop">
             <h1>Shop Our Beekeeping Products</h1>
-            <div class="products">
-                <div class="product" data-id="1" data-name="Bee Suit" data-price="89.99">
-                    <h2>Bee Suit</h2>
-                    <p>Protective suit for beekeepers. Made from durable material with veil and gloves.</p>
-                    <p class="price">$89.99</p>
-                    <button class="add-to-cart">Add to Cart</button>
+            
+            <!-- Hives & Equipment -->
+            <div class="category">
+                <h2 class="category-title">🏠 Hives & Equipment</h2>
+                <div class="products">
+                    <div class="product" data-id="24" data-name="Box Hive" data-price="5000">
+                        <h2>Box Hive</h2>
+                        <p>Traditional wooden box hive for natural beekeeping.</p>
+                        <p class="price"><span style="text-decoration: line-through; color: #999;">KSH 5,500</span> <strong>KSH 5,000</strong></p>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
+                    <div class="product" data-id="26" data-name="Kenya Top Bar Hive (KTBH)" data-price="4000">
+                        <img src="kenyatopbarhive.jpeg" alt="Kenya Top Bar Hive">
+                        <h2>Kenya Top Bar Hive (KTBH)</h2>
+                        <p>Complete Kenya Top Bar Hive system for natural beekeeping.</p>
+                        <p class="price"><span style="text-decoration: line-through; color: #999;">KSH 4,500</span> <strong>KSH 4,000</strong></p>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
+                    <div class="product" data-id="25" data-name="Langstroth Shallow Super" data-price="4500">
+                        <h2>Langstroth Shallow Super</h2>
+                        <p>Shallow super box for honey production in Langstroth hives.</p>
+                        <p class="price"><span style="text-decoration: line-through; color: #999;">KSH 5,000</span> <strong>KSH 4,500</strong></p>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
+                    <div class="product" data-id="27" data-name="Langstroth Deep Super" data-price="5000">
+                        <img src="langstrothhivedeepsuper.jpeg" alt="Langstroth Deep Super">
+                        <h2>Langstroth Deep Super</h2>
+                        <p>Deep super box for brood rearing in Langstroth hive systems.</p>
+                        <p class="price"><span style="text-decoration: line-through; color: #999;">KSH 5,500</span> <strong>KSH 5,000</strong></p>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
+                    <div class="product" data-id="28" data-name="Metalic Stands" data-price="2500">
+                        <div class="slideshow-container">
+                            <div class="slide active">
+                                <img src="metalicstand1.jpeg" alt="Metalic Stand 1">
+                            </div>
+                            <div class="slide">
+                                <img src="metalicstand2.jpeg" alt="Metalic Stand 2">
+                            </div>
+                            <button class="prev" onclick="changeSlide(this, -1)">❮</button>
+                            <button class="next" onclick="changeSlide(this, 1)">❯</button>
+                        </div>
+                        <h2>Metalic Stands</h2>
+                        <p>Durable metal stands for hive support and elevation.</p>
+                        <p class="price"><strong>KSH 2,500</strong></p>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
                 </div>
-                <div class="product" data-id="2" data-name="Bee Hive" data-price="149.99">
-                    <h2>Bee Hive</h2>
-                    <p>Complete hive setup for 10 frames. Includes hive body, bottom board, and inner cover.</p>
-                    <p class="price">$149.99</p>
-                    <button class="add-to-cart">Add to Cart</button>
+            </div>
+
+            <!-- Hive Components -->
+            <div class="category">
+                <h2 class="category-title">🔧 Hive Components</h2>
+                <div class="products">
+                    <div class="product" data-id="2" data-name="Queen Excluder" data-price="900">
+                        <h2>Queen Excluder</h2>
+                        <p>Prevents queen from entering honey supers while allowing workers through.</p>
+                        <p class="price"><span style="text-decoration: line-through; color: #999;">KSH 1,000</span> <strong>KSH 900</strong></p>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
+                    <div class="product" data-id="3" data-name="Framewire" data-price="1300">
+                        <h2>Framewire</h2>
+                        <p>High-quality wire for reinforcing frames and foundation.</p>
+                        <p class="price"><span style="text-decoration: line-through; color: #999;">KSH 1,400</span> <strong>KSH 1,300</strong></p>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
+                    <div class="product" data-id="7" data-name="Comb Foundation" data-price="50">
+                        <h2>Comb Foundation</h2>
+                        <p>Wax foundation sheets for frame construction.</p>
+                        <p class="price"><span style="text-decoration: line-through; color: #999;">KSH 60</span> <strong>KSH 50</strong></p>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
+                    <div class="product" data-id="18" data-name="KTBH Catcher Box" data-price="2500">
+                        <h2>KTBH Catcher Box</h2>
+                        <p>Swarm catcher box designed for Kenya Top Bar Hives.</p>
+                        <p class="price"><span style="text-decoration: line-through; color: #999;">KSH 3,000</span> <strong>KSH 2,500</strong></p>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
+                    <div class="product" data-id="19" data-name="Langstroth Catcher Box" data-price="2500">
+                        <h2>Langstroth Catcher Box</h2>
+                        <p>Swarm catcher box for Langstroth hive systems.</p>
+                        <p class="price"><span style="text-decoration: line-through; color: #999;">KSH 3,000</span> <strong>KSH 2,500</strong></p>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
                 </div>
-                <div class="product" data-id="3" data-name="Smoker" data-price="39.99">
-                    <h2>Smoker</h2>
-                    <p>Essential tool for calming bees during inspections. Stainless steel construction.</p>
-                    <p class="price">$39.99</p>
-                    <button class="add-to-cart">Add to Cart</button>
+            </div>
+
+            <!-- Protective Equipment -->
+            <div class="category">
+                <h2 class="category-title">🛡️ Protective Equipment</h2>
+                <div class="products">
+                    <div class="product" data-id="22" data-name="Bee Suit" data-price="4500">
+                        <h2>Bee Suit</h2>
+                        <p>Full protective suit with attached veil for complete protection.</p>
+                        <p class="price"><span style="text-decoration: line-through; color: #999;">KSH 5,000</span> <strong>KSH 4,500</strong></p>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
+                    <div class="product" data-id="5" data-name="Bee Gloves" data-price="800">
+                        <h2>Bee Gloves</h2>
+                        <p>Protective leather gloves with extended cuffs for bee handling.</p>
+                        <p class="price"><span style="text-decoration: line-through; color: #999;">KSH 900</span> <strong>KSH 800</strong></p>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
                 </div>
-                <div class="product" data-id="4" data-name="Hive Tool" data-price="19.99">
-                    <h2>Hive Tool</h2>
-                    <p>Multi-purpose tool for prying frames and scraping wax. Stainless steel blade.</p>
-                    <p class="price">$19.99</p>
-                    <button class="add-to-cart">Add to Cart</button>
+            </div>
+
+            <!-- Tools & Equipment -->
+            <div class="category">
+                <h2 class="category-title">🔨 Tools & Equipment</h2>
+                <div class="products">
+                    <div class="product" data-id="16" data-name="Stainless Bee Smoker" data-price="2800">
+                        <h2>Stainless Bee Smoker</h2>
+                        <p>Premium stainless steel smoker with bellows for bee calming.</p>
+                        <p class="price"><span style="text-decoration: line-through; color: #999;">KSH 3,000</span> <strong>KSH 2,800</strong></p>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
+                    <div class="product" data-id="21" data-name="Bee Smoker" data-price="1800">
+                        <h2>Bee Smoker</h2>
+                        <p>Standard bee smoker for calming bees during hive inspections.</p>
+                        <p class="price"><span style="text-decoration: line-through; color: #999;">KSH 2,000</span> <strong>KSH 1,800</strong></p>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
+                    <div class="product" data-id="17" data-name="Hive Tool" data-price="800">
+                        <h2>Hive Tool</h2>
+                        <p>Multi-purpose tool for prying frames and scraping wax.</p>
+                        <p class="price"><span style="text-decoration: line-through; color: #999;">KSH 850</span> <strong>KSH 800</strong></p>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
+                    <div class="product" data-id="20" data-name="Bee Brush" data-price="800">
+                        <h2>Bee Brush</h2>
+                        <p>Soft bristle brush for gently moving bees during inspections.</p>
+                        <p class="price"><strong>KSH 800</strong></p>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
+                    <div class="product" data-id="9" data-name="Uncapping Fork" data-price="800">
+                        <h2>Uncapping Fork</h2>
+                        <p>Tool for uncapping honey cells before extraction.</p>
+                        <p class="price"><span style="text-decoration: line-through; color: #999;">KSH 900</span> <strong>KSH 800</strong></p>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Honey Processing -->
+            <div class="category">
+                <h2 class="category-title">🍯 Honey Processing</h2>
+                <div class="products">
+                    <div class="product" data-id="12" data-name="4 Frames Manual Centrifuge Honey Extractor" data-price="44000">
+                        <h2>4 Frames Manual Centrifuge Honey Extractor</h2>
+                        <p>Manual honey extractor for 4 frames. Stainless steel construction.</p>
+                        <p class="price"><span style="text-decoration: line-through; color: #999;">KSH 46,000</span> <strong>KSH 44,000</strong></p>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
+                    <div class="product" data-id="13" data-name="6 Frames Manual Centrifuge Honey Extractor" data-price="71000">
+                        <h2>6 Frames Manual Centrifuge Honey Extractor</h2>
+                        <p>Manual honey extractor for 6 frames. Heavy-duty stainless steel.</p>
+                        <p class="price"><span style="text-decoration: line-through; color: #999;">KSH 72,000</span> <strong>KSH 71,000</strong></p>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
+                    <div class="product" data-id="8" data-name="Conical Sieve" data-price="800">
+                        <h2>Conical Sieve</h2>
+                        <p>Stainless steel strainer for filtering honey and removing impurities.</p>
+                        <p class="price"><span style="text-decoration: line-through; color: #999;">KSH 900</span> <strong>KSH 800</strong></p>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
+                    <div class="product" data-id="11" data-name="Double Sieve" data-price="3100">
+                        <h2>Double Sieve</h2>
+                        <p>Two-layer straining system for superior honey filtration.</p>
+                        <p class="price"><span style="text-decoration: line-through; color: #999;">KSH 3,500</span> <strong>KSH 3,100</strong></p>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
+                    <div class="product" data-id="1" data-name="Honey Refractometer" data-price="6200">
+                        <h2>Honey Refractometer</h2>
+                        <p>Measure honey moisture content accurately. Essential for quality control.</p>
+                        <p class="price"><span style="text-decoration: line-through; color: #999;">KSH 6,600</span> <strong>KSH 6,200</strong></p>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Storage & Containers -->
+            <div class="category">
+                <h2 class="category-title">📦 Storage & Containers</h2>
+                <div class="products">
+                    <div class="product" data-id="6" data-name="Honey Buckets" data-price="1000">
+                        <h2>Honey Buckets</h2>
+                        <p>Food-grade buckets for honey storage and transport.</p>
+                        <p class="price"><span style="text-decoration: line-through; color: #999;">KSH 1,200</span> <strong>KSH 1,000</strong></p>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
+                    <div class="product" data-id="15" data-name="Plastic Settling Buckets" data-price="1300">
+                        <h2>Plastic Settling Buckets</h2>
+                        <p>Food-grade plastic buckets for honey settling and storage.</p>
+                        <p class="price"><span style="text-decoration: line-through; color: #999;">KSH 1,500</span> <strong>KSH 1,300</strong></p>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Specialty Items -->
+            <div class="category">
+                <h2 class="category-title">✨ Specialty Items</h2>
+                <div class="products">
+                    <div class="product" data-id="10" data-name="Pollen Collector" data-price="3500">
+                        <h2>Pollen Collector</h2>
+                        <p>Device for collecting pollen from returning forager bees.</p>
+                        <p class="price"><span style="text-decoration: line-through; color: #999;">KSH 3,900</span> <strong>KSH 3,500</strong></p>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
+                    <div class="product" data-id="14" data-name="Lemon Grass (Bee Lure)" data-price="1300">
+                        <h2>Lemon Grass (Bee Lure)</h2>
+                        <p>Natural lemon grass essential oil for attracting bee swarms.</p>
+                        <p class="price"><span style="text-decoration: line-through; color: #999;">KSH 1,350</span> <strong>KSH 1,300</strong></p>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
+                    <div class="product" data-id="4" data-name="Bee Wax" data-price="1300">
+                        <h2>Bee Wax</h2>
+                        <p>Pure natural beeswax for various beekeeping and craft applications.</p>
+                        <p class="price"><span style="text-decoration: line-through; color: #999;">KSH 1,400</span> <strong>KSH 1,300</strong></p>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
+                    <div class="product" data-id="23" data-name="Honey" data-price="1000">
+                        <h2>Honey</h2>
+                        <p>Pure natural honey from our apiaries. 1lb jar.</p>
+                        <p class="price"><strong>KSH 1,000</strong></p>
+                        <button class="add-to-cart">Add to Cart</button>
+                    </div>
                 </div>
             </div>
         </section>
-
-        <aside class="cart">
-            <h2>Shopping Cart</h2>
-            <div id="cart-items"></div>
-            <div class="cart-total">
-                <strong>Total: $<span id="cart-total">0.00</span></strong>
-            </div>
-            <button id="checkout-btn">Checkout</button>
-        </aside>
     </main>
 
     <footer>
