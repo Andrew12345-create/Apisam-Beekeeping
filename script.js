@@ -315,7 +315,7 @@ async function updateUserInterface() {
             setTimeout(loadAdminUsers, 700);
         }
     }
-    }
+}
 
 async function login(email, password) {
     try {
@@ -382,14 +382,14 @@ async function signup(name,email,password) {
     }
 }
 
-function logout() { 
-    currentUser = null; 
+function logout() {
+    currentUser = null;
     token = null;
-    sessionStorage.removeItem('currentUser'); 
-    sessionStorage.removeItem('token'); 
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('token');
     localStorage.removeItem('adminSession');
     updateNavigation();
-    window.location.href='index.html'; 
+    window.location.href='index.html';
 }
 
 // Delegated submit listener to ensure signup/profile are intercepted even if specific handlers aren't attached
@@ -597,9 +597,9 @@ function displayShopProducts(products) {
 
 // Other DOM handlers and initializers
 document.addEventListener('DOMContentLoaded', function() {
-    // Load user from sessionStorage
-    token = sessionStorage.getItem('token');
-    const savedUser = sessionStorage.getItem('currentUser');
+    // Load user from localStorage
+    token = localStorage.getItem('token');
+    const savedUser = localStorage.getItem('currentUser');
     if (savedUser) {
         currentUser = JSON.parse(savedUser);
     }
@@ -669,8 +669,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     const data = await res.json();
                     token = data.token;
                     currentUser = data.user;
-                    sessionStorage.setItem('token', token);
-                    sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    localStorage.setItem('token', token);
+                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
                     msgEl.textContent = 'Login successful!'; msgEl.style.color = 'green';
                     updateNavigation();
                     setTimeout(() => window.location.href = 'shop.html', 1000);
@@ -707,42 +707,43 @@ let isSuperAdmin = false;
 // Show admin auth portal when admin page loads
 function initAdminAuthPortal() {
     const checkEl = document.getElementById('admin-auth-check');
-    const formEl = document.getElementById('admin-auth-form');
     const adminContent = document.getElementById('admin-content');
-    if (!checkEl || !formEl) return;
+    if (!checkEl) return;
     // Block admin content while checking
     if (adminContent) adminContent.style.display = 'none';
-    // Simulate checking state then show form (or skip if already authenticated)
+    // Always show checking state first
     checkEl.textContent = 'CHECKING IF YOU ARE ADMIN...';
-    // If already authenticated and admin, show content immediately
-    if (currentUser) {
-        if (currentUser.isAdmin) {
-            if (adminContent) adminContent.style.display = 'block';
-            document.getElementById('admin-auth-portal').style.display = 'none';
+
+    // Simulate checking state then decide next step
+    setTimeout(() => {
+        if (currentUser) {
+            if (currentUser.isAdmin) {
+                // Logged-in admin: start with super admin verification
+                startSuperAdminVerification();
+                return;
+            }
+            // Logged-in user is not an admin: deny entry
+            checkEl.textContent = 'Access denied — your account is not an admin.';
             return;
         }
-        // Logged-in user is not an admin: deny entry without showing password form
-        checkEl.textContent = 'Access denied — your account is not an admin.';
-        formEl.style.display = 'none';
-        return;
-    }
 
-    // Not logged in: show verification form after brief check
-    setTimeout(() => {
+        // Not logged in: show step 1
         checkEl.textContent = 'Please verify credentials to continue';
-        formEl.style.display = 'block';
+        document.getElementById('admin-auth-form-step1').style.display = 'block';
     }, 800);
 }
 
-async function submitAdminAuth() {
+// Step 1: Admin Email and Password Form
+async function submitAdminAuthStep1() {
     const email = document.getElementById('admin-auth-email').value.trim();
     const password = document.getElementById('admin-auth-password').value;
-    const msgEl = document.getElementById('admin-auth-message');
+    const isSuperAdminClaim = document.getElementById('is-super-admin-checkbox').checked;
+    const msgEl = document.getElementById('admin-auth-message-step1');
     if (!email || !password) { if (msgEl) msgEl.textContent = 'Please provide both email and password'; return; }
-    if (msgEl) { msgEl.style.color = '#333'; msgEl.textContent = 'Verifying...'; }
+    if (msgEl) { msgEl.style.color = '#333'; msgEl.textContent = 'Verifying admin credentials...'; }
 
     try {
-        const res = await fetch(apiUrl('/api/admin/authenticate'), {
+        const res = await fetch(apiUrl('/api/login'), {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password })
         });
         if (!res.ok) {
@@ -752,24 +753,128 @@ async function submitAdminAuth() {
             return;
         }
         const data = await res.json();
+        // Check if user is admin
+        if (!data.user.isAdmin) {
+            if (msgEl) { msgEl.style.color = '#c00'; msgEl.textContent = 'Access denied - not an admin account'; }
+            return;
+        }
         // store token and currentUser
         token = data.token;
         currentUser = data.user;
         localStorage.setItem('token', token);
         localStorage.setItem('currentUser', JSON.stringify(currentUser));
-        if (msgEl) { msgEl.style.color = 'green'; msgEl.textContent = 'Verified — loading admin data...'; }
-        // hide portal and reveal admin content
-        const portal = document.getElementById('admin-auth-portal');
-        const adminContent = document.getElementById('admin-content');
-        if (portal) portal.style.display = 'none';
-        if (adminContent) adminContent.style.display = 'block';
-        // load admin UI
-        updateUserInterface();
-        setTimeout(() => { loadAdminUsers(); loadProducts(); }, 300);
+        if (msgEl) { msgEl.style.color = 'green'; msgEl.textContent = 'Admin credentials verified!'; }
+
+        // Branch based on super admin claim
+        if (isSuperAdminClaim) {
+            // Proceed to step 2: Super Admin Verification
+            setTimeout(() => {
+                document.getElementById('admin-auth-form-step1').style.display = 'none';
+                document.getElementById('admin-auth-form-step2').style.display = 'block';
+                document.getElementById('super-admin-email-display').textContent = currentUser.email;
+                document.getElementById('super-admin-status-display').textContent = currentUser.isSuperAdmin ? 'Super Admin' : 'Regular Admin';
+            }, 1000);
+        } else {
+            // Proceed directly to normal admin access
+            setTimeout(() => {
+                const portal = document.getElementById('admin-auth-portal');
+                const adminContent = document.getElementById('admin-content');
+                if (portal) portal.style.display = 'none';
+                if (adminContent) adminContent.style.display = 'block';
+                // load admin UI
+                updateUserInterface();
+                setTimeout(() => { loadAdminUsers(); loadProducts(); }, 300);
+            }, 1000);
+        }
     } catch (err) {
         if (msgEl) { msgEl.style.color = '#c00'; msgEl.textContent = 'Network error during verification'; }
         console.error('Admin auth error', err);
     }
+}
+
+// Step 2: Super Admin Verification
+async function submitAdminAuthStep2() {
+    const msgEl = document.getElementById('admin-auth-message-step2');
+    if (msgEl) { msgEl.style.color = '#333'; msgEl.textContent = 'Confirming super admin access...'; }
+
+    try {
+        // Verify super admin privileges
+        const res = await fetch(apiUrl('/api/admin/verify-super-admin'), {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) {
+            const body = await res.json().catch(()=>({}));
+            if (msgEl) { msgEl.style.color = '#c00'; msgEl.textContent = body.message || 'Super admin verification failed'; }
+            return;
+        }
+        const data = await res.json();
+        if (data.isSuperAdmin) {
+            if (msgEl) { msgEl.style.color = 'green'; msgEl.textContent = 'Super admin verified!'; }
+            // Proceed to step 3: Password confirmation
+            setTimeout(() => {
+                document.getElementById('admin-auth-form-step2').style.display = 'none';
+                document.getElementById('admin-auth-form-step3').style.display = 'block';
+                // Populate step 3 with user info
+                document.getElementById('super-admin-email-display').textContent = currentUser.email;
+                document.getElementById('super-admin-status-display').textContent = 'Super Admin';
+            }, 1000);
+        } else {
+            if (msgEl) { msgEl.style.color = '#c00'; msgEl.textContent = 'Access denied - insufficient privileges'; }
+        }
+    } catch (err) {
+        if (msgEl) { msgEl.style.color = '#c00'; msgEl.textContent = 'Network error during verification'; }
+        console.error('Super admin verification error', err);
+    }
+}
+
+// Step 3: Super Admin Password Confirmation
+async function submitAdminAuthStep3() {
+    const passwordConfirm = document.getElementById('admin-auth-password-confirm').value;
+    const msgEl = document.getElementById('admin-auth-message-step3');
+    if (!passwordConfirm) { if (msgEl) msgEl.textContent = 'Please re-enter your password'; return; }
+    if (msgEl) { msgEl.style.color = '#333'; msgEl.textContent = 'Verifying password...'; }
+
+    try {
+        // Verify the password matches the original
+        const res = await fetch(apiUrl('/api/admin/verify-password'), {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ password: passwordConfirm })
+        });
+        if (!res.ok) {
+            const body = await res.json().catch(()=>({}));
+            if (msgEl) { msgEl.style.color = '#c00'; msgEl.textContent = body.message || 'Password verification failed'; }
+            return;
+        }
+        if (msgEl) { msgEl.style.color = 'green'; msgEl.textContent = 'Password verified! Super admin access granted!'; }
+        // Grant access
+        setTimeout(() => {
+            const portal = document.getElementById('admin-auth-portal');
+            const adminContent = document.getElementById('admin-content');
+            if (portal) portal.style.display = 'none';
+            if (adminContent) adminContent.style.display = 'block';
+            // load admin UI
+            updateUserInterface();
+            setTimeout(() => { loadAdminUsers(); loadProducts(); }, 300);
+        }, 1000);
+    } catch (err) {
+        if (msgEl) { msgEl.style.color = '#c00'; msgEl.textContent = 'Network error during verification'; }
+        console.error('Password verification error', err);
+    }
+}
+
+// Navigation between phases
+function backToStep1() {
+    document.getElementById('admin-auth-form-step2').style.display = 'none';
+    document.getElementById('admin-auth-form-step1').style.display = 'block';
+    document.getElementById('admin-auth-message-step1').textContent = '';
+    document.getElementById('admin-auth-message-step2').textContent = '';
+}
+
+// Start super admin verification for logged-in admins
+function startSuperAdminVerification() {
+    document.getElementById('admin-auth-check').textContent = 'Super Admin Verification Required';
+    document.getElementById('admin-auth-form-step3').style.display = 'block';
+    document.getElementById('super-admin-email-display').textContent = currentUser.email;
+    document.getElementById('super-admin-status-display').textContent = currentUser.isSuperAdmin ? 'Super Admin' : 'Regular Admin';
 }
 
 async function loadAdminUsers() {
@@ -847,7 +952,19 @@ async function loadAdminUsers() {
         console.log('loadAdminUsers(): server returned', Array.isArray(data.users) ? data.users.length : '(no users array)', 'users');
         if (Array.isArray(data.users)) console.log('User emails:', data.users.map(u=>u.email).slice(0,50));
         isSuperAdmin = data.currentUser?.isSuperAdmin || false;
-        
+
+        // Update dashboard title based on super admin status
+        const titleEl = document.getElementById('admin-dashboard-title-text');
+        if (titleEl) {
+            titleEl.textContent = isSuperAdmin ? 'Super Admin Dashboard' : 'Admin Dashboard';
+        }
+
+        // Show super admin panel if super admin
+        const superPanel = document.getElementById('super-admin-panel');
+        if (superPanel) {
+            superPanel.style.display = isSuperAdmin ? 'block' : 'none';
+        }
+
         // Show create admin button for super admin
         const createBtn = document.getElementById('create-admin-btn');
         if (createBtn) createBtn.style.display = isSuperAdmin ? 'inline-block' : 'none';

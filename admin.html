@@ -17,19 +17,52 @@
 
     <main>
         <section class="admin">
-            <h1>Admin Dashboard <span id="admin-timer" style="float:right;font-size:0.8em;color:#f39c12;background:rgba(0,0,0,0.1);padding:5px 10px;border-radius:5px;"></span></h1>
+            <h1><span id="admin-dashboard-title-text">Admin Dashboard</span> <span id="admin-timer" style="float:right;font-size:0.8em;color:#f39c12;background:rgba(0,0,0,0.1);padding:5px 10px;border-radius:5px;"></span></h1>
             <div id="admin-auth-portal" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.55);z-index:9999;">
-                <div style="background:#fff;padding:20px;border-radius:8px;max-width:420px;width:100%;box-shadow:0 8px 24px rgba(0,0,0,0.4);">
+                <div style="background:#fff;padding:20px;border-radius:8px;max-width:500px;width:100%;box-shadow:0 8px 24px rgba(0,0,0,0.4);">
                     <div id="admin-auth-check" style="font-weight:700;margin-bottom:8px;">CHECKING IF YOU ARE ADMIN...</div>
-                    <div id="admin-auth-form" style="display:none; margin-top:6px;">
-                        <p>Please enter your admin email and password to proceed.</p>
-                        <form id="admin-auth" onsubmit="event.preventDefault(); submitAdminAuth();">
+
+                    <!-- Step 1: Admin Authentication -->
+                    <div id="admin-auth-form-step1" style="display:none; margin-top:6px;">
+                        <h3 style="margin-top:0; color:#d9534f;">🔐 Admin Authentication</h3>
+                        <p>Please enter your admin credentials to proceed.</p>
+                        <form id="admin-auth-step1" onsubmit="event.preventDefault(); submitAdminAuthStep1();">
                             <input type="email" id="admin-auth-email" placeholder="Admin email" required style="display:block; margin-bottom:8px; width:100%; padding:8px;">
                             <input type="password" id="admin-auth-password" placeholder="Admin password" required style="display:block; margin-bottom:8px; width:100%; padding:8px;">
-                            <div style="display:flex;gap:8px;align-items:center;"><button type="submit">Verify</button></div>
-                            <div id="admin-auth-message" style="margin-top:8px;color:#c00;"></div>
+                            <label style="display:block; margin-bottom:8px;"><input type="checkbox" id="is-super-admin-checkbox"> I am a super admin</label>
+                            <div style="display:flex;gap:8px;align-items:center;"><button type="submit">Verify Admin Credentials</button></div>
+                            <div id="admin-auth-message-step1" style="margin-top:8px;color:#c00;"></div>
                         </form>
                     </div>
+
+                    <!-- Step 2: Super Admin Verification -->
+                    <div id="admin-auth-form-step2" style="display:none; margin-top:6px;">
+                        <h3 style="margin-top:0; color:#f0ad4e;">🔑 Super Admin Verification</h3>
+                        <p>Confirming super admin access for: <span id="super-admin-email-display"></span> (<span id="super-admin-status-display"></span>)</p>
+                        <form id="admin-auth-step2" onsubmit="event.preventDefault(); submitAdminAuthStep2();">
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <button type="button" onclick="backToStep1()">Back</button>
+                                <button type="submit">Confirm Super Admin Access</button>
+                            </div>
+                            <div id="admin-auth-message-step2" style="margin-top:8px;color:#c00;"></div>
+                        </form>
+                    </div>
+
+                    <!-- Step 3: Password Verification -->
+                    <div id="admin-auth-form-step3" style="display:none; margin-top:6px;">
+                        <h3 style="margin-top:0; color:#28a745;">🔒 Password Verification</h3>
+                        <p>For security purposes, please re-enter your account password.</p>
+                        <form id="admin-auth-step3" onsubmit="event.preventDefault(); submitAdminAuthStep3();">
+                            <input type="password" id="admin-auth-password-confirm" placeholder="Re-enter your password" required style="display:block; margin-bottom:8px; width:100%; padding:8px;">
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <button type="button" onclick="backToStep2()">Back</button>
+                                <button type="submit">Verify Password</button>
+                            </div>
+                            <div id="admin-auth-message-step3" style="margin-top:8px;color:#c00;"></div>
+                        </form>
+                    </div>
+
+
                 </div>
             </div>
             <div id="admin-content" class="admin-content">
@@ -111,7 +144,7 @@
                             </select>
                         </div>
                         <div id="products-table"></div>
-                        
+
                         <!-- Stock Update Form -->
                         <div id="stock-update-form" style="display:none; margin-top:20px; padding:15px; border:1px solid #ddd;">
                             <h3>Update Stock</h3>
@@ -131,6 +164,28 @@
                                 <button type="submit">Update Stock</button>
                                 <button type="button" onclick="hideStockForm()">Cancel</button>
                             </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Super Admin Advanced Features -->
+                <div id="super-admin-panel" class="admin-panel" style="display:none; border: 2px solid #28a745; background: linear-gradient(135deg, #f8fff8 0%, #e8f5e8 100%);">
+                    <h2 style="color: #28a745;">🔧 Advanced System Controls</h2>
+                    <div class="super-admin-features">
+                        <div class="feature-section">
+                            <h3>System Analytics</h3>
+                            <button onclick="viewSystemAnalytics()">View System Analytics</button>
+                            <button onclick="exportUserData()">Export User Data</button>
+                        </div>
+                        <div class="feature-section">
+                            <h3>Security Management</h3>
+                            <button onclick="viewSecurityLogs()">View Security Logs</button>
+                            <button onclick="manageSystemSettings()">System Settings</button>
+                        </div>
+                        <div class="feature-section">
+                            <h3>Database Operations</h3>
+                            <button onclick="backupDatabase()">Backup Database</button>
+                            <button onclick="optimizeDatabase()">Optimize Database</button>
                         </div>
                     </div>
                 </div>
