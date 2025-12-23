@@ -29,8 +29,23 @@ function loadNavbar() {
         });
 }
 
-// Cart
-let cart = JSON.parse(localStorage.getItem('cart')) || [];
+// Cart - now user-specific
+function getCartKey() {
+    return currentUser ? `cart_${currentUser.email}` : 'cart_guest';
+}
+
+function loadCart() {
+    const cartKey = getCartKey();
+    cart = JSON.parse(localStorage.getItem(cartKey)) || [];
+    updateCartDisplay();
+}
+
+function saveCart() {
+    const cartKey = getCartKey();
+    localStorage.setItem(cartKey, JSON.stringify(cart));
+}
+
+let cart = [];
 function updateCartDisplay() {
     const cartItems = document.getElementById('cart-items');
     const cartTotal = document.getElementById('cart-total');
@@ -39,10 +54,10 @@ function updateCartDisplay() {
     const cartCount = document.getElementById('cart-count');
     const sidebarItems = document.getElementById('sidebar-cart-items');
     const sidebarTotal = document.getElementById('sidebar-cart-total');
-    
+
     let total = 0;
     let itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-    
+
     const cartHTML = cart.map((item, i) => {
         const itemTotal = parseFloat(item.price || 0) * item.quantity;
         total += itemTotal;
@@ -58,7 +73,7 @@ function updateCartDisplay() {
             </div>
         `;
     }).join('');
-    
+
     const sidebarHTML = cart.length > 0 ? cart.map((item, i) => {
         const itemTotal = parseFloat(item.price || 0) * item.quantity;
         return `
@@ -79,7 +94,7 @@ function updateCartDisplay() {
             </div>
         `;
     }).join('') : '<div class="empty-cart">Your cart is empty</div>';
-    
+
     if (cartItems) cartItems.innerHTML = cartHTML;
     if (cartItemsPage) cartItemsPage.innerHTML = cartHTML;
     if (sidebarItems) sidebarItems.innerHTML = sidebarHTML;
@@ -87,8 +102,8 @@ function updateCartDisplay() {
     if (cartTotalPage) cartTotalPage.textContent = total.toLocaleString();
     if (sidebarTotal) sidebarTotal.textContent = total.toLocaleString();
     if (cartCount) cartCount.textContent = itemCount;
-    
-    localStorage.setItem('cart', JSON.stringify(cart));
+
+    saveCart();
     updateProductButtons();
 }
 
@@ -193,6 +208,18 @@ let currentUser = JSON.parse(localStorage.getItem('currentUser')) || null;
 // Prevent duplicate form handling
 let __handlingSubmit = false;
 
+// Function to check if JWT token is expired
+function isTokenExpired(token) {
+    if (!token) return true;
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const currentTime = Date.now() / 1000;
+        return payload.exp < currentTime;
+    } catch (e) {
+        return true; // If parsing fails, consider it expired
+    }
+}
+
 const API_PORT = 3000;
 let API_BASE = '';
 // If the page is opened via file:// or there's no port, point API requests at localhost:3000
@@ -221,8 +248,8 @@ function updateNavigation() {
     const navUl = document.querySelector('nav ul');
     if (!navUl) return;
 
-    // Clear existing auth links
-    const existingAuthLinks = navUl.querySelectorAll('li a[href="login.html"], li a[href="signup.html"], li a[href="profile.html"]');
+    // Clear ALL existing auth links
+    const existingAuthLinks = navUl.querySelectorAll('li a[href="login.html"], li a[href="signup.html"], li a[href="profile.html"], li a[href="#"]');
     existingAuthLinks.forEach(link => link.parentElement.remove());
 
     // Add appropriate links based on auth state
@@ -261,7 +288,9 @@ async function updateUserInterface() {
             } else {
                 const errorData = await res.json().catch(() => ({}));
                 if (errorData.banned) {
-                    // User is banned - show message and logout
+                    // User is banned - show message, set ban status, and logout
+                    localStorage.setItem('banned', 'true');
+                    localStorage.setItem('banMessage', errorData.message);
                     alert(errorData.message);
                     logout();
                     return;
@@ -437,6 +466,8 @@ function startBanCheck() {
             if (res.status === 403) {
                 const errorData = await res.json().catch(() => ({}));
                 if (errorData.banned) {
+                    localStorage.setItem('banned', 'true');
+                    localStorage.setItem('banMessage', errorData.message);
                     alert(`You have been banned: ${errorData.message}`);
                     logout();
                 }
@@ -603,9 +634,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (savedUser) {
         currentUser = JSON.parse(savedUser);
     }
-    
+
     // Load navbar and initialize UI
-    loadNavbar(); updateCartDisplay(); updateNavigation();
+    loadNavbar(); loadCart(); updateCartDisplay(); updateNavigation();
     
     // Create cart sidebar and floating button
     createCartSidebar();
@@ -661,25 +692,28 @@ document.addEventListener('DOMContentLoaded', function() {
             if (__handlingSubmit) return;
             __handlingSubmit = true;
             try {
+                // Check if user is banned before attempting login
+                if (localStorage.getItem('banned') === 'true') {
+                    const banMessage = localStorage.getItem('banMessage') || 'Your account has been banned.';
+                    const msgEl = document.getElementById('login-message');
+                    if (msgEl) {
+                        msgEl.textContent = banMessage;
+                        msgEl.style.color = 'red';
+                        msgEl.style.fontWeight = 'bold';
+                        msgEl.style.padding = '1rem';
+                        msgEl.style.border = '2px solid #dc3545';
+                        msgEl.style.borderRadius = '8px';
+                        msgEl.style.backgroundColor = '#f8d7da';
+                    }
+                    return;
+                }
+
                 const email = document.getElementById('login-email').value.trim();
                 const password = document.getElementById('login-password').value;
-                const res = await fetch(apiUrl('/api/login'), { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ email, password }) });
-                const msgEl = document.getElementById('login-message');
-                if (res.ok) {
-                    const data = await res.json();
-                    token = data.token;
-                    currentUser = data.user;
-                    localStorage.setItem('token', token);
-                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
-                    msgEl.textContent = 'Login successful!'; msgEl.style.color = 'green';
+                const success = await login(email, password);
+                if (success) {
                     updateNavigation();
                     setTimeout(() => window.location.href = 'shop.html', 1000);
-                } else {
-                    // Do not overwrite server-provided message; login() already sets messages on failure.
-                    if (msgEl && !msgEl.textContent) {
-                        msgEl.textContent = 'Invalid credentials!';
-                        msgEl.style.color = 'red';
-                    }
                 }
             } finally {
                 __handlingSubmit = false;
@@ -795,7 +829,7 @@ async function submitAdminAuthStep1() {
 // Step 2: Super Admin Verification
 async function submitAdminAuthStep2() {
     const msgEl = document.getElementById('admin-auth-message-step2');
-    if (msgEl) { msgEl.style.color = '#333'; msgEl.textContent = 'Confirming super admin access...'; }
+    if (msgEl) { msgEl.style.color = '#333'; msgEl.textContent = 'CHECKING IF SUPERADMIN...'; }
 
     try {
         // Verify super admin privileges
@@ -819,7 +853,30 @@ async function submitAdminAuthStep2() {
                 document.getElementById('super-admin-status-display').textContent = 'Super Admin';
             }, 1000);
         } else {
-            if (msgEl) { msgEl.style.color = '#c00'; msgEl.textContent = 'Access denied - insufficient privileges'; }
+            // User claimed to be superadmin but verification failed - ban them for 5 minutes
+            if (msgEl) { msgEl.style.color = '#c00'; msgEl.textContent = 'Super admin verification failed. You have been banned for 5 minutes.'; }
+
+            try {
+                // Ban the user for 5 minutes
+                const banRes = await fetch(apiUrl(`/api/admin/ban/${currentUser.id}`), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ duration: 5, reason: 'Failed super admin verification' })
+                });
+
+                if (banRes.ok) {
+                    // Logout the user and redirect
+                    setTimeout(() => {
+                        logout();
+                        alert('You have been banned for 5 minutes due to failed super admin verification.');
+                        window.location.href = 'index.html';
+                    }, 2000);
+                } else {
+                    console.error('Failed to ban user after failed super admin verification');
+                }
+            } catch (banErr) {
+                console.error('Error banning user:', banErr);
+            }
         }
     } catch (err) {
         if (msgEl) { msgEl.style.color = '#c00'; msgEl.textContent = 'Network error during verification'; }
@@ -1412,5 +1469,9 @@ async function checkAdminAccess() {
     }
     
     document.getElementById('admin-auth-check').style.display = 'none';
-    document.getElementById('admin-auth-form').style.display = 'block';
+    document.getElementById('admin-auth-form-step1').style.display = 'block';
+    // Pre-fill email for logged-in admin
+    if (currentUser && currentUser.email) {
+        document.getElementById('admin-auth-email').value = currentUser.email;
+    }
 }

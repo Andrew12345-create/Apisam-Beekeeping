@@ -49,6 +49,16 @@ app.post('/api/login', async (req, res) => {
     }
 
     const user = result.rows[0];
+
+    // Check if user is banned
+    if (user.is_banned) {
+      const banMessage = user.ban_reason || 'Your account has been banned.';
+      return res.status(403).json({
+        message: banMessage,
+        banned: true
+      });
+    }
+
     const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {
       return res.status(401).json({ message: 'Invalid credentials' });

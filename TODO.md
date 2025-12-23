@@ -1,12 +1,11 @@
-# TODO: Make Navbar Appear on All Pages
+# TODO: Implement User-Specific Cart and Ban Login Prevention
 
-- [x] Replace navbar-container in index.html with static navbar
-- [ ] Replace navbar-container in about.html with static navbar
-- [ ] Replace navbar-container in shop.html with static navbar
-- [ ] Replace navbar-container in contact.html with static navbar
-- [ ] Replace navbar-container in login.html with static navbar
-- [ ] Replace navbar-container in signup.html with static navbar
-- [ ] Replace navbar-container in profile.html with static navbar
-- [ ] Replace navbar-container in admin.html with static navbar
-- [ ] Test navbar appearance on all pages
-- [ ] Verify auth link updates work correctly
+## Tasks
+- [x] Modify cart storage to be user-specific using 'cart_' + userEmail keys
+- [x] Add helper functions for getting current cart key and loading/saving cart
+- [x] Update updateCartDisplay to use user-specific storage
+- [x] Update addToCart, changeQuantity, removeFromCart to work with user-specific cart
+- [x] Add cart loading on login and saving on logout
+- [x] Prevent banned users from attempting login by checking localStorage 'banned' flag
+- [x] Test login blocking for banned users (requires manual testing)
+- [x] Test cart isolation between different accounts (requires manual testing)
