@@ -1,11 +1,14 @@
-# TODO: Implement User-Specific Cart and Ban Login Prevention
 
-## Tasks
-- [x] Modify cart storage to be user-specific using 'cart_' + userEmail keys
-- [x] Add helper functions for getting current cart key and loading/saving cart
-- [x] Update updateCartDisplay to use user-specific storage
-- [x] Update addToCart, changeQuantity, removeFromCart to work with user-specific cart
-- [x] Add cart loading on login and saving on logout
-- [x] Prevent banned users from attempting login by checking localStorage 'banned' flag
-- [x] Test login blocking for banned users (requires manual testing)
-- [x] Test cart isolation between different accounts (requires manual testing)
+# TODO for Dungeon Quest Game
+
+- [x] Define game classes (Player, Room, Monster, Item, Quest)
+- [x] Create game world with multiple rooms and connections
+- [x] Implement combat system
+- [x] Add item collection and inventory management
+- [x] Implement quests and progression
+- [x] Create main game loop with user input
+- [x] Test the game by running it
+- [x] Fix quest checking bug after monster defeat
+- [x] Add random crazy weapons when defeating monsters
+- [x] Add twists and random events in rooms
+- [x] Add special dragon defeat mechanic using inventory items

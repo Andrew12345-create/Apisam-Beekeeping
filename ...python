@@ -1,0 +1,322 @@
+import random
+
+class Player:
+    def __init__(self, name):
+        self.name = name
+        self.health = 100
+        self.max_health = 100
+        self.attack = 10
+        self.defense = 5
+        self.inventory = []
+        self.location = 'entrance'
+        self.quests = []
+
+    def take_damage(self, damage):
+        self.health -= damage
+        if self.health <= 0:
+            print(f"{self.name} has been defeated!")
+            return True
+        return False
+
+    def heal(self, amount):
+        self.health = min(self.max_health, self.health + amount)
+        print(f"{self.name} healed for {amount} health. Current health: {self.health}")
+
+    def add_item(self, item):
+        self.inventory.append(item)
+        print(f"Added {item.name} to inventory.")
+
+    def remove_item(self, item_name):
+        for item in self.inventory:
+            if item.name.lower() == item_name.lower():
+                self.inventory.remove(item)
+                print(f"Removed {item.name} from inventory.")
+                return item
+        print(f"{item_name} not found in inventory.")
+        return None
+
+    def show_inventory(self):
+        if not self.inventory:
+            print("Inventory is empty.")
+        else:
+            print("Inventory:")
+            for item in self.inventory:
+                print(f"- {item.name}: {item.description}")
+
+class Item:
+    def __init__(self, name, description, item_type, value=0):
+        self.name = name
+        self.description = description
+        self.type = item_type  # 'weapon', 'potion', 'key', etc.
+        self.value = value
+
+class Monster:
+    def __init__(self, name, health, attack, defense):
+        self.name = name
+        self.health = health
+        self.attack = attack
+        self.defense = defense
+
+    def take_damage(self, damage):
+        self.health -= damage
+        if self.health <= 0:
+            print(f"{self.name} has been defeated!")
+            return True
+        return False
+
+class Room:
+    def __init__(self, name, description, items=None, monster=None, connections=None):
+        self.name = name
+        self.description = description
+        self.items = items or []
+        self.monster = monster
+        self.connections = connections or {}
+
+class Quest:
+    def __init__(self, name, description, objective, reward):
+        self.name = name
+        self.description = description
+        self.objective = objective  # e.g., {'kill': 'goblin', 'count': 1}
+        self.reward = reward
+        self.completed = False
+
+def create_world():
+    # Create items
+    sword = Item("Sword", "A sharp blade that increases attack power.", "weapon", 5)
+    potion = Item("Health Potion", "Restores 50 health points.", "potion", 50)
+    key = Item("Key", "A rusty key that might open locked doors.", "key")
+
+    # Create monsters
+    goblin = Monster("Goblin", 30, 8, 2)
+    orc = Monster("Orc", 50, 12, 5)
+    dragon = Monster("Dragon", 100, 20, 10)
+
+    # Create rooms
+    entrance = Room("entrance", "You stand at the entrance of a dark dungeon. A path leads north into the unknown.")
+    dungeon = Room("dungeon", "A damp, stone-walled room filled with the stench of decay. There's a goblin lurking here.", monster=goblin)
+    forest = Room("forest", "You find yourself in a dense forest. Strange noises echo around you.")
+    castle = Room("castle", "An ancient castle looms before you. The door is locked.", items=[key])
+    treasure_room = Room("treasure_room", "A room filled with gold and jewels! But beware, a dragon guards it.", monster=dragon)
+
+    # Connect rooms
+    entrance.connections = {'north': 'dungeon'}
+    dungeon.connections = {'south': 'entrance', 'east': 'forest'}
+    forest.connections = {'west': 'dungeon', 'north': 'castle'}
+    castle.connections = {'south': 'forest', 'north': 'treasure_room'}
+    treasure_room.connections = {'south': 'castle'}
+
+    # Add items to rooms
+    dungeon.items = [sword]
+    forest.items = [potion]
+
+    # Create crazy weapons
+    crazy_weapons = [
+        Item("Laser Sword", "A futuristic sword that shoots lasers!", "weapon", 15),
+        Item("Magic Hammer", "A hammer that summons thunder!", "weapon", 12),
+        Item("Poison Dagger", "A dagger coated in deadly poison!", "weapon", 10),
+        Item("Explosive Bow", "A bow that shoots explosive arrows!", "weapon", 14),
+        Item("Ice Wand", "A wand that freezes enemies solid!", "weapon", 11),
+        Item("Giant Club", "A massive club that crushes everything!", "weapon", 13),
+        Item("Fire Axe", "An axe engulfed in eternal flames!", "weapon", 16),
+        Item("Shadow Blade", "A blade that strikes from the shadows!", "weapon", 9)
+    ]
+
+    return {
+        'entrance': entrance,
+        'dungeon': dungeon,
+        'forest': forest,
+        'castle': castle,
+        'treasure_room': treasure_room,
+        'crazy_weapons': crazy_weapons
+    }
+
+def combat(player, monster, world):
+    print(f"A {monster.name} attacks!")
+
+    # Special dragon defeat mechanic
+    if monster.name.lower() == "dragon":
+        print("The mighty Dragon blocks your path! Do you want to use items from your inventory to defeat it?")
+        player.show_inventory()
+        use_items = input("Do you want to use your inventory items to defeat the Dragon? (y/n): ").lower()
+        if use_items == 'y':
+            # Check for key items
+            has_sword = any(item.name.lower() == "sword" for item in player.inventory)
+            has_key = any(item.name.lower() == "key" for item in player.inventory)
+            has_potion = any(item.name.lower() == "health potion" for item in player.inventory)
+
+            if has_sword and has_key and has_potion:
+                print("Using your Sword, Key, and Health Potion, you unleash a powerful combo attack!")
+                print("The Dragon is defeated with ease!")
+                # Remove used items
+                player.remove_item("sword")
+                player.remove_item("key")
+                player.remove_item("health potion")
+                return True
+            elif has_sword and has_key:
+                print("Using your Sword and Key, you strike a mighty blow!")
+                print("The Dragon is defeated!")
+                player.remove_item("sword")
+                player.remove_item("key")
+                return True
+            elif has_sword:
+                print("Using your Sword, you manage to defeat the Dragon!")
+                player.remove_item("sword")
+                return True
+            else:
+                print("You don't have the right items to defeat the Dragon this way. You'll have to fight normally.")
+        else:
+            print("You choose to fight the Dragon normally.")
+
+    while player.health > 0 and monster.health > 0:
+        # Player turn
+        action = input("Do you want to (a)ttack or (r)un? ").lower()
+        if action == 'a':
+            damage = max(1, player.attack - monster.defense + random.randint(-2, 2))
+            if monster.take_damage(damage):
+                print(f"You defeated the {monster.name}!")
+                # Random chance to get a crazy weapon
+                if random.random() < 0.3:  # 30% chance
+                    crazy_weapon = random.choice(world['crazy_weapons'])
+                    player.add_item(crazy_weapon)
+                    print(f"You found a {crazy_weapon.name} after defeating the {monster.name}!")
+                return True
+            else:
+                print(f"You dealt {damage} damage to the {monster.name}.")
+        elif action == 'r':
+            if random.random() < 0.5:
+                print("You successfully fled!")
+                return False
+            else:
+                print("You couldn't escape!")
+        else:
+            print("Invalid action.")
+
+        # Monster turn
+        if monster.health > 0:
+            damage = max(1, monster.attack - player.defense + random.randint(-2, 2))
+            if player.take_damage(damage):
+                return False
+            else:
+                print(f"The {monster.name} dealt {damage} damage to you.")
+
+    return player.health > 0
+
+def main():
+    print("Welcome to Dungeon Quest!")
+    player_name = input("Enter your character's name: ")
+    player = Player(player_name)
+
+    world = create_world()
+
+    # Create quests
+    quest1 = Quest("Defeat the Goblin", "Kill the goblin in the dungeon.", {'kill': 'goblin', 'count': 1}, "Sword")
+    player.quests.append(quest1)
+
+    while True:
+        current_room = world[player.location]
+        print(f"\n{current_room.name.upper()}")
+        print(current_room.description)
+
+        # Random twist event
+        if random.random() < 0.2:  # 20% chance for a twist
+            twist = random.choice([
+                "trap",
+                "hidden_item",
+                "random_buff",
+                "surprise_encounter"
+            ])
+            if twist == "trap":
+                damage = random.randint(5, 15)
+                player.take_damage(damage)
+                print(f"Oh no! You triggered a trap and took {damage} damage!")
+            elif twist == "hidden_item":
+                hidden_item = random.choice(world['crazy_weapons'])
+                player.add_item(hidden_item)
+                print(f"You found a hidden {hidden_item.name}!")
+            elif twist == "random_buff":
+                buff = random.choice(["health", "attack", "defense"])
+                if buff == "health":
+                    player.heal(20)
+                elif buff == "attack":
+                    player.attack += 3
+                    print("You feel stronger! Attack increased by 3.")
+                elif buff == "defense":
+                    player.defense += 2
+                    print("You feel tougher! Defense increased by 2.")
+            elif twist == "surprise_encounter":
+                surprise_monster = Monster("Surprise " + random.choice(["Rat", "Bat", "Spider"]), 20, 5, 1)
+                print(f"A {surprise_monster.name} appears out of nowhere!")
+                if not combat(player, surprise_monster, world):
+                    print("Game Over!")
+                    break
+
+        if current_room.monster:
+            monster_name = current_room.monster.name.lower()
+            print(f"There's a {current_room.monster.name} here!")
+            if not combat(player, current_room.monster, world):
+                print("Game Over!")
+                break
+            else:
+                current_room.monster = None  # Remove defeated monster
+                # Check quests
+                for quest in player.quests:
+                    if not quest.completed and quest.objective.get('kill') == monster_name:
+                        quest.objective['count'] -= 1
+                        if quest.objective['count'] <= 0:
+                            quest.completed = True
+                            print(f"Quest '{quest.name}' completed! Reward: {quest.reward}")
+                            # Add reward to inventory or apply effect
+
+        # Show items in room
+        if current_room.items:
+            print("Items in this room:")
+            for item in current_room.items:
+                print(f"- {item.name}")
+
+        # Player actions
+        action = input("What do you want to do? (l)ook, (t)ake item, (u)se item, (i)nventory, (m)ove, (q)uit: ").lower()
+
+        if action == 'l':
+            print(current_room.description)
+        elif action == 't':
+            if current_room.items:
+                item_name = input("Which item do you want to take? ")
+                for item in current_room.items:
+                    if item.name.lower() == item_name.lower():
+                        player.add_item(item)
+                        current_room.items.remove(item)
+                        break
+                else:
+                    print("Item not found.")
+            else:
+                print("No items here.")
+        elif action == 'u':
+            item_name = input("Which item do you want to use? ")
+            item = player.remove_item(item_name)
+            if item:
+                if item.type == 'potion':
+                    player.heal(item.value)
+                elif item.type == 'weapon':
+                    player.attack += item.value
+                    print(f"Your attack increased by {item.value}!")
+                else:
+                    print("You can't use that item right now.")
+        elif action == 'i':
+            player.show_inventory()
+        elif action == 'm':
+            print("Available directions:")
+            for direction, room_name in current_room.connections.items():
+                print(f"- {direction}: {room_name}")
+            direction = input("Which direction? ").lower()
+            if direction in current_room.connections:
+                player.location = current_room.connections[direction]
+            else:
+                print("You can't go that way.")
+        elif action == 'q':
+            print("Thanks for playing!")
+            break
+        else:
+            print("Invalid action.")
+
+if __name__ == "__main__":
+    main()

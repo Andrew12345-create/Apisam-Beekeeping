@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apisam Beekeeping - Payment</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Leaflet for interactive maps -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="" defer></script>
+    <script src="script.js" defer></script>
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <img src="logo.png" alt="Apisam Beekeeping Logo">
+        </div>
+        <div id="navbar-container"></div>
+    </header>
+
+    <main>
+        <section class="payment">
+            <h1>Payment</h1>
+            <div class="payment-container">
+                <div class="order-summary">
+                    <h3>Order Summary</h3>
+                    <div id="payment-cart-items"></div>
+                    <div class="total">Total: KSH <span id="payment-total">0</span></div>
+                    <div class="delivery-info">
+                        <h4>Delivery Location</h4>
+                        <div id="delivery-location">
+                            <label for="delivery-address-select">Choose address:</label>
+                            <select id="delivery-address-select">
+                                <option value="default">Use my profile address</option>
+                                <option value="custom">Enter new address</option>
+                            </select>
+                            <div id="delivery-custom" style="margin-top:8px; display:none;">
+                                <textarea id="delivery-address" rows="3" placeholder="Street, City, County" style="width:100%;"></textarea>
+                                <div style="margin-top:6px; display:flex; gap:8px;">
+                                    <button type="button" id="use-current-location">Use current location</button>
+                                    <span id="geo-status" style="align-self:center;color:#666;font-size:0.9rem"></span>
+                                </div>
+                                <div id="delivery-map" style="height:300px; margin-top:10px; border-radius:8px; overflow:hidden; display:none;"></div>
+                            </div>
+                            <input type="hidden" id="delivery-lat">
+                            <input type="hidden" id="delivery-lng">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="payment-methods">
+                    <h3>Select Payment Method:</h3>
+                    <div class="payment-options">
+                        <button onclick="selectPaymentMethod('mpesa')" class="payment-method-btn" id="mpesa-btn">
+                            📱 M-Pesa
+                        </button>
+                        <button onclick="selectPaymentMethod('card')" class="payment-method-btn" id="card-btn">
+                            💳 Bank Card
+                        </button>
+                    </div>
+
+                    <div id="mpesa-payment" style="display:none;">
+                        <h4>M-Pesa Payment</h4>
+                        <form id="mpesa-form">
+                            <input type="tel" id="mpesa-phone" placeholder="Phone Number (254...)" required>
+                            <button type="submit">Pay with M-Pesa</button>
+                        </form>
+                        <div id="mpesa-status"></div>
+                    </div>
+
+                    <div id="card-payment" style="display:none;">
+                        <h4>Bank Card Payment</h4>
+                        <form id="card-form">
+                            <input type="text" id="card-number" placeholder="Card Number" required>
+                            <div style="display:flex;gap:10px;">
+                                <input type="text" id="card-expiry" placeholder="MM/YY" required>
+                                <input type="text" id="card-cvv" placeholder="CVV" required>
+                            </div>
+                            <input type="text" id="card-name" placeholder="Cardholder Name" required>
+                            <button type="submit">Pay with Card</button>
+                        </form>
+                        <div id="card-status"></div>
+                    </div>
+
+                    <div id="payment-processing" style="display:none;">
+                        <h4>Processing Payment...</h4>
+                        <div class="loading-spinner"></div>
+                        <p id="processing-message">Please wait while we process your payment...</p>
+                    </div>
+
+                    <div id="payment-success" style="display:none;">
+                        <h4>✅ Payment Successful!</h4>
+                        <p>Your order has been confirmed and will be delivered to your selected location.</p>
+                        <button onclick="completeCheckout()" class="complete-btn">Complete Order</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2023 Apisam Beekeeping. All rights reserved.</p>
+    </footer>
+</body>
+</html>

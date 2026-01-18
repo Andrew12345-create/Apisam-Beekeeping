@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Confirmation - Apisam Beekeeping</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="script.js" defer></script>
+</head>
+<body>
+    <header>
+        <div class="logo"><img src="logo.png" alt="Apisam Beekeeping"></div>
+        <div id="navbar-container"></div>
+    </header>
+
+    <main class="confirmation-page">
+        <section class="confirmation">
+            <h1>Thank you — your order is confirmed</h1>
+            <div id="confirmation-content">
+                <p>Loading order details…</p>
+            </div>
+            <div style="margin-top:1rem; display:flex; gap:10px;">
+                <button onclick="window.location.href='shop.html'">Continue Shopping</button>
+                <button onclick="window.location.href='profile.html'">View Orders</button>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 Apisam Beekeeping</p>
+    </footer>
+
+    <script>
+    (function(){
+        function maskNumber(n){ return n ? (String(n).slice(-4).padStart(4,'*')) : '' }
+        const params = new URLSearchParams(location.search);
+        const orderId = params.get('order');
+        let order = null;
+        try {
+            const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+            if (orderId) order = orders.find(o=>o.id===orderId) || null;
+            if (!order) order = JSON.parse(localStorage.getItem('lastOrder') || 'null');
+        } catch (e) { order = null }
+
+        const el = document.getElementById('confirmation-content');
+        if (!el) return;
+        if (!order) { el.innerHTML = '<p>Order not found.</p>'; return; }
+
+        const itemsHtml = (order.items || []).map(it=>`<li>${escapeHtml(it.name)} x${it.quantity} — KSH ${ (parseFloat(it.price||0)*it.quantity).toLocaleString() }</li>`).join('');
+        const delivery = order.details?.delivery || {};
+        const method = order.method || '';
+        const paymentInfo = method === 'card' ? (`Paid by card ending ${escapeHtml(order.details?.number || '')}`) : (`Paid by ${escapeHtml(method)}`);
+
+        el.innerHTML = `
+            <div class="order-box">
+                <h2>Order ID: ${escapeHtml(order.id)}</h2>
+                <p><strong>Total:</strong> KSH ${escapeHtml(order.total)}</p>
+                <p><strong>${paymentInfo}</strong></p>
+                <h3>Items</h3>
+                <ul>${itemsHtml}</ul>
+                <h3>Delivery</h3>
+                <p>${escapeHtml(delivery.address || 'No address provided')}</p>
+                ${delivery.lat && delivery.lng ? `<p><a href="https://www.google.com/maps/search/?api=1&query=${delivery.lat},${delivery.lng}" target="_blank">View on map</a></p>` : ''}
+                <p><small>Placed on ${new Date(order.date).toLocaleString()}</small></p>
+            </div>
+        `;
+    })();
+    </script>
+</body>
+</html>

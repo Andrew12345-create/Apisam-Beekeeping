@@ -176,16 +176,28 @@
                             <h3>System Analytics</h3>
                             <button onclick="viewSystemAnalytics()">View System Analytics</button>
                             <button onclick="exportUserData()">Export User Data</button>
+                            <button onclick="viewSecurityAudit()">Security Audit</button>
                         </div>
                         <div class="feature-section">
                             <h3>Security Management</h3>
                             <button onclick="viewSecurityLogs()">View Security Logs</button>
                             <button onclick="manageSystemSettings()">System Settings</button>
+                            <button onclick="revokeAllSessions()">Revoke All Sessions</button>
                         </div>
                         <div class="feature-section">
                             <h3>Database Operations</h3>
                             <button onclick="backupDatabase()">Backup Database</button>
                             <button onclick="optimizeDatabase()">Optimize Database</button>
+                        </div>
+                        <div class="feature-section">
+                            <h3>Session Management</h3>
+                            <div id="session-info" style="margin: 10px 0; padding: 10px; background: rgba(255,255,255,0.7); border-radius: 5px;">
+                                <strong>Session Status:</strong> <span id="session-status">Loading...</span><br>
+                                <strong>Time Remaining:</strong> <span id="session-time">--:--</span><br>
+                                <strong>Session Type:</strong> <span id="session-type">--</span>
+                            </div>
+                            <button onclick="extendCurrentSession()">Extend Session</button>
+                            <button onclick="revokeCurrentSession()">End Session</button>
                         </div>
                     </div>
                 </div>

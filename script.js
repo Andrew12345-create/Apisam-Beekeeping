@@ -46,6 +46,8 @@ function saveCart() {
 }
 
 let cart = [];
+let deliveryMap = null;
+let deliveryMarker = null;
 function updateCartDisplay() {
     const cartItems = document.getElementById('cart-items');
     const cartTotal = document.getElementById('cart-total');
@@ -248,8 +250,8 @@ function updateNavigation() {
     const navUl = document.querySelector('nav ul');
     if (!navUl) return;
 
-    // Clear ALL existing auth links
-    const existingAuthLinks = navUl.querySelectorAll('li a[href="login.html"], li a[href="signup.html"], li a[href="profile.html"], li a[href="#"]');
+    // Clear existing auth links
+    const existingAuthLinks = navUl.querySelectorAll('li a[href="login.html"], li a[href="signup.html"], li a[href="profile.html"]');
     existingAuthLinks.forEach(link => link.parentElement.remove());
 
     // Add appropriate links based on auth state
@@ -309,18 +311,60 @@ async function updateUserInterface() {
     if (profileContent) {
         if (currentUser) {
             profileContent.innerHTML = `
-                <h2>Welcome, ${currentUser.name}!</h2>
-                <p>Email: ${currentUser.email}</p>
-                <p>Last login: ${currentUser.lastLogin ? new Date(currentUser.lastLogin).toLocaleString() : 'N/A'}</p>
-                <h3>Account Settings</h3>
-                <form id="profile-form">
-                    <div class="form-group"><label for="profile-name">Full Name:</label><input type="text" id="profile-name" value="${currentUser.name}" required></div>
-                    <div class="form-group"><label for="profile-email">Email:</label><input type="email" id="profile-email" value="${currentUser.email}" required></div>
-                    <button type="submit">Update Profile</button>
-                </form>
-                <button onclick="logout()" style="margin-top:1rem;">Logout</button>
+                <div class="profile-grid">
+                    <div class="profile-main">
+                        <h2>Welcome, ${currentUser.name}!</h2>
+                        <p><strong>Email:</strong> ${currentUser.email}</p>
+                        <p><strong>Last login:</strong> ${currentUser.lastLogin ? new Date(currentUser.lastLogin).toLocaleString() : 'N/A'}</p>
+
+                        <h3>Account Settings</h3>
+                        <form id="profile-form">
+                            <div class="form-group"><label for="profile-name">Full Name:</label><input type="text" id="profile-name" value="${escapeHtml(currentUser.name)}" required></div>
+                            <div class="form-group"><label for="profile-email">Email:</label><input type="email" id="profile-email" value="${escapeHtml(currentUser.email)}" required></div>
+                            <button type="submit">Update Profile</button>
+                        </form>
+
+                        <h3>Saved Addresses</h3>
+                        <div id="addresses-list"></div>
+                        <div id="address-form">
+                            <textarea id="new-address" rows="3" placeholder="Street, City, County"></textarea>
+                            <div style="margin-top:8px; display:flex; gap:8px;"><button id="add-address-btn" type="button">Add Address</button><button id="use-geo-address" type="button">Use current location</button></div>
+                        </div>
+
+                        <h3>Your Orders</h3>
+                        <div id="profile-orders">Loading orders…</div>
+                    </div>
+                    <aside class="profile-side">
+                        <div class="profile-actions">
+                            <button onclick="window.location.href='shop.html'">Continue Shopping</button>
+                            <button onclick="window.location.href='cart.html'">View Cart (<span id='side-cart-count'>0</span>)</button>
+                            <button onclick="logout()">Logout</button>
+                        </div>
+                    </aside>
+                </div>
                 <div id="profile-message"></div>
             `;
+
+            // After inserting markup, bind address and orders
+            setTimeout(() => {
+                // render saved addresses
+                renderSavedAddresses();
+                document.getElementById('add-address-btn').addEventListener('click', addAddressFromForm);
+                document.getElementById('use-geo-address').addEventListener('click', () => {
+                    const geoStatusEl = document.getElementById('profile-message');
+                    if (!navigator.geolocation) { if (geoStatusEl) geoStatusEl.textContent = 'Geolocation not supported'; return; }
+                    navigator.geolocation.getCurrentPosition(pos => {
+                        const a = `Current location: ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;
+                        document.getElementById('new-address').value = a;
+                    }, err => { if (geoStatusEl) geoStatusEl.textContent = 'Unable to get location'; }, { timeout:8000 });
+                });
+
+                // render orders
+                renderProfileOrders();
+                // update small cart count
+                const sideCount = document.getElementById('side-cart-count'); if (sideCount) sideCount.textContent = cart.reduce((s,i)=>s+i.quantity,0);
+            }, 50);
+
         } else {
             profileContent.innerHTML = '<p>Please <a href="login.html">login</a> to view your profile.</p>';
         }
@@ -391,7 +435,7 @@ async function login(email, password) {
         if (u) { currentUser = u; localStorage.setItem('currentUser', JSON.stringify(currentUser)); return true; }
         const msgEl = document.getElementById('login-message');
         if (msgEl) {
-            msgEl.textContent = 'Network error during login';
+            msgEl.textContent = 'Unable to connect to server. Please ensure the server is running by executing "npm start" in the project directory.';
             msgEl.style.color = 'red';
         }
         console.error('Login error:', err);
@@ -417,6 +461,7 @@ function logout() {
     localStorage.removeItem('currentUser');
     localStorage.removeItem('token');
     localStorage.removeItem('adminSession');
+    localStorage.removeItem('adminSessionId');
     updateNavigation();
     window.location.href='index.html';
 }
@@ -636,7 +681,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Load navbar and initialize UI
-    loadNavbar(); loadCart(); updateCartDisplay(); updateNavigation();
+    loadNavbar(); loadCart(); updateCartDisplay(); updateNavigation(); updateUserInterface();
     
     // Create cart sidebar and floating button
     createCartSidebar();
@@ -646,8 +691,13 @@ document.addEventListener('DOMContentLoaded', function() {
     if (currentUser && token) startBanCheck();
 
     // Load products on shop page
-    if (window.location.pathname.includes('shop.html')) {
+    if (window.location.pathname.includes('shop.html') || document.getElementById('shop-products')) {
         setTimeout(loadShopProducts, 500);
+    }
+
+    // Render payment page if present
+    if (window.location.pathname.includes('payment.html') || document.getElementById('payment-cart-items')) {
+        setTimeout(renderPaymentPage, 200);
     }
     
     // Check admin access on admin page
@@ -675,12 +725,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const checkoutBtn = document.getElementById('checkout-btn');
     const checkoutBtnPage = document.getElementById('checkout-btn-page');
-    
+
     [checkoutBtn, checkoutBtnPage].forEach(btn => {
         if (btn) btn.addEventListener('click', function() {
             if (cart.length === 0) { alert('Your cart is empty!'); return; }
             if (!currentUser) { alert('Please login to checkout!'); window.location.href='login.html'; return; }
-            alert('Checkout successful! Thank you for your purchase.'); cart = []; updateCartDisplay();
+            // Navigate to dedicated payment page for a real checkout flow
+            window.location.href = 'payment.html';
         });
     });
 
@@ -736,6 +787,374 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Admin helpers
+// --- Checkout / Payment helpers ---
+function renderPaymentPage() {
+    try {
+        const cartKey = getCartKey();
+        const paymentCart = JSON.parse(localStorage.getItem(cartKey)) || [];
+        const container = document.getElementById('payment-cart-items');
+        const totalEl = document.getElementById('payment-total');
+        if (!container || !totalEl) return;
+
+        if (paymentCart.length === 0) {
+            container.innerHTML = '<div class="empty-cart">Your cart is empty. <a href="shop.html">Continue shopping</a></div>';
+            totalEl.textContent = '0';
+            return;
+        }
+
+        let total = 0;
+        const html = paymentCart.map(item => {
+            const price = parseFloat(item.price || 0);
+            const line = price * (item.quantity || 1);
+            total += line;
+            return `<div class="payment-line"><div class="p-name">${escapeHtml(item.name)}</div><div class="p-qty">x${item.quantity}</div><div class="p-price">KSH ${line.toLocaleString()}</div></div>`;
+        }).join('');
+
+        container.innerHTML = html;
+        totalEl.textContent = total.toLocaleString();
+
+        // Bind payment method selectors
+        document.querySelectorAll('.payment-method-btn').forEach(btn => btn.classList.remove('active'));
+        selectPaymentMethod('mpesa');
+
+        // Delivery UI
+        const addrSelect = document.getElementById('delivery-address-select');
+        const customDiv = document.getElementById('delivery-custom');
+        const useCurrentBtn = document.getElementById('use-current-location');
+        const geoStatus = document.getElementById('geo-status');
+        // populate saved addresses into select
+        try {
+            if (addrSelect) {
+                // keep default and custom, then insert saved
+                const defaultOpt = addrSelect.querySelector('option[value="default"]');
+                const customOpt = addrSelect.querySelector('option[value="custom"]');
+                addrSelect.innerHTML = '';
+                if (defaultOpt) addrSelect.appendChild(defaultOpt);
+                if (customOpt) addrSelect.appendChild(customOpt);
+                const addrKey = currentUser ? `addresses_${currentUser.email}` : 'addresses_guest';
+                const saved = JSON.parse(localStorage.getItem(addrKey) || '[]');
+                saved.forEach((a,i)=>{
+                    const o = document.createElement('option'); o.value = `saved_${i}`;
+                    o.textContent = (typeof a === 'string') ? a : (a.address || `${a.lat}, ${a.lng}`);
+                    addrSelect.appendChild(o);
+                });
+                // if a previously selected delivery exists, pre-select
+                try {
+                    const sel = JSON.parse(localStorage.getItem('selectedDelivery') || 'null');
+                    if (sel && sel.address) {
+                        // try match saved
+                        const matchIndex = (saved || []).findIndex(s=>s===sel.address);
+                                if (matchIndex !== -1) {
+                                    addrSelect.value = `saved_${matchIndex}`; if (customDiv) customDiv.style.display='none';
+                                    // if saved has coords, show map
+                                    const savedEntry = saved[matchIndex];
+                                    if (savedEntry && typeof savedEntry !== 'string' && savedEntry.lat && savedEntry.lng) initDeliveryMap(savedEntry.lat, savedEntry.lng);
+                                } else {
+                                    addrSelect.value = 'custom'; if (customDiv) customDiv.style.display='block'; const addrEl = document.getElementById('delivery-address'); if (addrEl) addrEl.value = sel.address;
+                                    if (sel.lat && sel.lng) initDeliveryMap(sel.lat, sel.lng);
+                                }
+                    }
+                } catch (e) { /* ignore */ }
+            }
+        } catch(e) { console.warn('populate addresses failed', e); }
+        if (addrSelect) {
+            addrSelect.addEventListener('change', function() {
+                if (this.value === 'custom') { if (customDiv) customDiv.style.display = 'block'; document.getElementById('delivery-map').style.display = 'block'; }
+                else { if (customDiv) customDiv.style.display = 'none'; }
+                if (this.value && this.value.startsWith('saved_')) {
+                    const idx = parseInt(this.value.split('_')[1],10);
+                    const addrKey = currentUser ? `addresses_${currentUser.email}` : 'addresses_guest';
+                    const saved = JSON.parse(localStorage.getItem(addrKey) || '[]');
+                    const entry = saved[idx];
+                    if (entry && typeof entry !== 'string' && entry.lat && entry.lng) {
+                        initDeliveryMap(entry.lat, entry.lng);
+                        document.getElementById('delivery-lat').value = entry.lat;
+                        document.getElementById('delivery-lng').value = entry.lng;
+                        if (document.getElementById('delivery-address')) document.getElementById('delivery-address').value = entry.address || '';
+                    }
+                }
+            });
+        }
+        if (useCurrentBtn) {
+            useCurrentBtn.addEventListener('click', function() {
+                if (!navigator.geolocation) { if (geoStatus) geoStatus.textContent = 'Geolocation not supported'; return; }
+                geoStatus.textContent = 'Locating…';
+                navigator.geolocation.getCurrentPosition(pos => {
+                    const lat = pos.coords.latitude; const lng = pos.coords.longitude;
+                        document.getElementById('delivery-lat').value = lat;
+                        document.getElementById('delivery-lng').value = lng;
+                        if (document.getElementById('delivery-address')) document.getElementById('delivery-address').value = `Current location: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+                        geoStatus.textContent = 'Location set';
+                        // show/update map
+                        initDeliveryMap(lat, lng);
+                }, err => {
+                    geoStatus.textContent = 'Unable to get location';
+                }, { timeout: 8000 });
+            });
+        }
+
+        // Attach form handlers
+        const mpesaForm = document.getElementById('mpesa-form');
+        if (mpesaForm && !mpesaForm.dataset.bound) {
+            mpesaForm.addEventListener('submit', handleMpesaSubmit);
+            mpesaForm.dataset.bound = '1';
+        }
+        const cardForm = document.getElementById('card-form');
+        if (cardForm && !cardForm.dataset.bound) {
+            cardForm.addEventListener('submit', handleCardSubmit);
+            cardForm.dataset.bound = '1';
+        }
+    } catch (err) {
+        console.error('renderPaymentPage error', err);
+    }
+}
+
+function selectPaymentMethod(method) {
+    const mpesaDiv = document.getElementById('mpesa-payment');
+    const cardDiv = document.getElementById('card-payment');
+    const mpesaBtn = document.getElementById('mpesa-btn');
+    const cardBtn = document.getElementById('card-btn');
+
+    if (mpesaDiv) mpesaDiv.style.display = method === 'mpesa' ? 'block' : 'none';
+    if (cardDiv) cardDiv.style.display = method === 'card' ? 'block' : 'none';
+    if (mpesaBtn) mpesaBtn.classList.toggle('active', method === 'mpesa');
+    if (cardBtn) cardBtn.classList.toggle('active', method === 'card');
+}
+
+function initDeliveryMap(lat, lng) {
+    const mapEl = document.getElementById('delivery-map');
+    if (!mapEl) return;
+    mapEl.style.display = 'block';
+    if (typeof L === 'undefined') { console.warn('Leaflet not available'); return; }
+
+    const defaultCenter = (lat && lng) ? [parseFloat(lat), parseFloat(lng)] : (currentUser && currentUser.lat && currentUser.lng ? [currentUser.lat, currentUser.lng] : [-1.286389, 36.817223]);
+
+    if (!deliveryMap) {
+        deliveryMap = L.map('delivery-map').setView(defaultCenter, 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors' }).addTo(deliveryMap);
+        deliveryMarker = L.marker(defaultCenter, { draggable: true }).addTo(deliveryMap);
+        deliveryMarker.on('dragend', function() {
+            const p = deliveryMarker.getLatLng();
+            document.getElementById('delivery-lat').value = p.lat;
+            document.getElementById('delivery-lng').value = p.lng;
+            if (document.getElementById('delivery-address')) document.getElementById('delivery-address').value = `Selected location: ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`;
+        });
+    } else {
+        deliveryMap.setView(defaultCenter, 13);
+        if (!deliveryMarker) {
+            deliveryMarker = L.marker(defaultCenter, { draggable: true }).addTo(deliveryMap);
+            deliveryMarker.on('dragend', function() {
+                const p = deliveryMarker.getLatLng();
+                document.getElementById('delivery-lat').value = p.lat;
+                document.getElementById('delivery-lng').value = p.lng;
+                if (document.getElementById('delivery-address')) document.getElementById('delivery-address').value = `Selected location: ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`;
+            });
+        } else {
+            deliveryMarker.setLatLng(defaultCenter);
+        }
+    }
+
+    // Some browsers require a small delay before invalidating size
+    setTimeout(() => { try { deliveryMap.invalidateSize(); } catch (e) {} }, 200);
+}
+
+function handleMpesaSubmit(e) {
+    e.preventDefault();
+    const phone = document.getElementById('mpesa-phone').value.trim();
+    if (!/^254\d{9}$/.test(phone)) {
+        const st = document.getElementById('mpesa-status'); if (st) { st.textContent = 'Please enter a valid phone number starting with 254'; st.style.color = 'red'; }
+        return;
+    }
+    processPayment('mpesa', { phone });
+}
+
+function handleCardSubmit(e) {
+    e.preventDefault();
+    const number = document.getElementById('card-number').value.replace(/\s+/g,'');
+    const expiry = document.getElementById('card-expiry').value.trim();
+    const cvv = document.getElementById('card-cvv').value.trim();
+    const name = document.getElementById('card-name').value.trim();
+    if (number.length < 12 || number.length > 19) { const st = document.getElementById('card-status'); if (st) { st.textContent='Invalid card number'; st.style.color='red'; } return; }
+    if (!/^(0[1-9]|1[0-2])\/(\d{2})$/.test(expiry)) { const st = document.getElementById('card-status'); if (st) { st.textContent='Expiry must be MM/YY'; st.style.color='red'; } return; }
+    if (!/^\d{3,4}$/.test(cvv)) { const st = document.getElementById('card-status'); if (st) { st.textContent='Invalid CVV'; st.style.color='red'; } return; }
+
+    // NOTE: integrate real card processor here (Stripe/PayPal). We pass masked details to local simulation.
+    processPayment('card', { number: `**** **** **** ${number.slice(-4)}`, expiry, name });
+}
+
+function getDeliveryDetails() {
+    try {
+        const sel = document.getElementById('delivery-address-select');
+        const addrEl = document.getElementById('delivery-address');
+        const latEl = document.getElementById('delivery-lat');
+        const lngEl = document.getElementById('delivery-lng');
+        const lat = latEl?.value;
+        const lng = lngEl?.value;
+        if (!sel) return null;
+
+        // If saved option selected, return its stored data
+        if (sel.value && sel.value.startsWith('saved_')) {
+            const idx = parseInt(sel.value.split('_')[1], 10);
+            const addrKey = currentUser ? `addresses_${currentUser.email}` : 'addresses_guest';
+            const saved = JSON.parse(localStorage.getItem(addrKey) || '[]');
+            const entry = saved[idx];
+            if (!entry) return { address: null, lat: lat || null, lng: lng || null };
+            if (typeof entry === 'string') return { address: entry, lat: lat || null, lng: lng || null };
+            return { address: entry.address || null, lat: entry.lat || lat || null, lng: entry.lng || lng || null };
+        }
+
+        if (sel.value === 'custom') {
+            const address = (addrEl && addrEl.value) ? addrEl.value.trim() : '';
+            return { address: address || null, lat: lat || null, lng: lng || null };
+        }
+
+        // default: use currentUser address if available
+        return { address: currentUser && currentUser.address ? currentUser.address : null, lat: lat || null, lng: lng || null };
+    } catch (e) { return null; }
+}
+
+function processPayment(method, details) {
+    // Show processing UI
+    const methodsContainer = document.querySelector('.payment-methods');
+    const processing = document.getElementById('payment-processing');
+    const mpesaStatus = document.getElementById('mpesa-status');
+    const cardStatus = document.getElementById('card-status');
+    if (methodsContainer) methodsContainer.querySelectorAll('button, input, form').forEach(el => el.setAttribute('disabled','true'));
+    if (mpesaStatus) mpesaStatus.textContent = '';
+    if (cardStatus) cardStatus.textContent = '';
+    if (processing) processing.style.display = 'block';
+
+    try {
+        details = details || {};
+        details.delivery = getDeliveryDetails();
+    } catch (e) { details.delivery = null; }
+
+    // Simulate a network/payment delay and success
+    setTimeout(() => {
+        if (processing) processing.style.display = 'none';
+        // show success
+        const success = document.getElementById('payment-success');
+        if (success) success.style.display = 'block';
+        // Store a simple order record and redirect to confirmation
+        try {
+            const cartKey = getCartKey();
+            const paymentCart = JSON.parse(localStorage.getItem(cartKey)) || [];
+            const order = { id: 'ORD' + Date.now(), user: currentUser ? currentUser.email : null, items: paymentCart, method, details, total: document.getElementById('payment-total')?.textContent || '0', date: new Date().toISOString() };
+            const orders = JSON.parse(localStorage.getItem('orders')) || [];
+            orders.push(order);
+            localStorage.setItem('orders', JSON.stringify(orders));
+            localStorage.setItem('lastOrder', JSON.stringify(order));
+            // Redirect to confirmation page after brief success UI
+            setTimeout(() => {
+                window.location.href = `order-confirmation.html?order=${encodeURIComponent(order.id)}`;
+            }, 1200);
+        } catch (e) { console.error('store order error', e); }
+    }, 1400);
+}
+
+function completeCheckout() {
+    try {
+        const cartKey = getCartKey();
+        localStorage.removeItem(cartKey);
+        cart = [];
+        updateCartDisplay();
+        window.location.href = 'shop.html?order=success';
+    } catch (err) {
+        console.error('completeCheckout error', err);
+        window.location.href = 'shop.html';
+    }
+}
+
+// Address and profile orders helpers
+function getAddressesKey() {
+    return currentUser ? `addresses_${currentUser.email}` : 'addresses_guest';
+}
+
+function renderSavedAddresses() {
+    const key = getAddressesKey();
+    const list = JSON.parse(localStorage.getItem(key) || '[]');
+    const container = document.getElementById('addresses-list');
+    if (!container) return;
+    if (!list || list.length === 0) { container.innerHTML = '<div class="empty">No saved addresses</div>'; return; }
+    container.innerHTML = list.map((a,i)=>{
+        const text = (typeof a === 'string') ? a : (a.address || `${a.lat}, ${a.lng}`);
+        return `<div class="addr-row"><div class="addr-text">${escapeHtml(text)}</div><div class="addr-actions"><button onclick="useAddress(${i})">Use</button><button onclick="removeAddress(${i})">Remove</button></div></div>`;
+    }).join('');
+}
+
+function addAddressFromForm() {
+    const val = document.getElementById('new-address').value.trim();
+    if (!val) return alert('Enter an address');
+    const key = getAddressesKey();
+    const list = JSON.parse(localStorage.getItem(key) || '[]');
+    // If the form contains a "Current location: lat, lng" string, store structured entry
+    const currentLocMatch = val.match(/Current location:\s*([-+]?\d+\.?\d*),\s*([-+]?\d+\.?\d*)/i);
+    if (currentLocMatch) {
+        const lat = parseFloat(currentLocMatch[1]);
+        const lng = parseFloat(currentLocMatch[2]);
+        list.push({ address: val, lat, lng });
+    } else {
+        list.push(val);
+    }
+    localStorage.setItem(key, JSON.stringify(list));
+    document.getElementById('new-address').value = '';
+    renderSavedAddresses();
+}
+
+function removeAddress(index) {
+    const key = getAddressesKey();
+    const list = JSON.parse(localStorage.getItem(key) || '[]');
+    if (index < 0 || index >= list.length) return;
+    list.splice(index,1);
+    localStorage.setItem(key, JSON.stringify(list));
+    renderSavedAddresses();
+}
+
+function useAddress(index) {
+    const key = getAddressesKey();
+    const list = JSON.parse(localStorage.getItem(key) || '[]');
+    const addr = list[index];
+    if (!addr) return;
+    // store as selected delivery for payment page, include lat/lng if present
+    if (typeof addr === 'string') {
+        localStorage.setItem('selectedDelivery', JSON.stringify({ address: addr }));
+    } else {
+        localStorage.setItem('selectedDelivery', JSON.stringify({ address: addr.address || null, lat: addr.lat || null, lng: addr.lng || null }));
+    }
+    alert('Address selected for delivery. Proceed to payment to confirm.');
+}
+
+function renderProfileOrders() {
+    const container = document.getElementById('profile-orders');
+    if (!container) return;
+    const all = JSON.parse(localStorage.getItem('orders') || '[]');
+    const orders = currentUser ? all.filter(o=>o.user===currentUser.email) : all;
+    if (!orders || orders.length === 0) { container.innerHTML = '<div class="empty">No orders yet</div>'; return; }
+    container.innerHTML = orders.slice().reverse().map(o=>{
+        const items = (o.items||[]).map(it=>`${escapeHtml(it.name)} x${it.quantity}`).join('<br>');
+        return `<div class="order-row"><div class="order-id">${escapeHtml(o.id)}</div><div class="order-items">${items}</div><div class="order-total">KSH ${escapeHtml(o.total)}</div><div class="order-actions"><button onclick="reorderOrder('${o.id}')">Reorder</button><a href="order-confirmation.html?order=${encodeURIComponent(o.id)}">Details</a></div></div>`;
+    }).join('');
+}
+
+function reorderOrder(orderId) {
+    try {
+        const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+        const order = orders.find(o=>o.id===orderId);
+        if (!order) return alert('Order not found');
+        const cartKey = getCartKey();
+        const existing = JSON.parse(localStorage.getItem(cartKey) || '[]');
+        const merged = [...existing];
+        order.items.forEach(it => {
+            const idx = merged.findIndex(m=>m.id===it.id);
+            if (idx !== -1) merged[idx].quantity = (parseInt(merged[idx].quantity)||0) + (parseInt(it.quantity)||0);
+            else merged.push(Object.assign({}, it));
+        });
+        localStorage.setItem(cartKey, JSON.stringify(merged));
+        cart = merged; updateCartDisplay();
+        alert('Items added to cart from order');
+        window.location.href = 'cart.html';
+    } catch (e) { console.error('reorder error', e); alert('Could not reorder'); }
+}
 let isSuperAdmin = false;
 
 // Show admin auth portal when admin page loads
@@ -797,6 +1216,9 @@ async function submitAdminAuthStep1() {
         currentUser = data.user;
         localStorage.setItem('token', token);
         localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        // Generate and store sessionId for subsequent admin operations
+        const sessionId = 'admin_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('adminSessionId', sessionId);
         if (msgEl) { msgEl.style.color = 'green'; msgEl.textContent = 'Admin credentials verified!'; }
 
         // Branch based on super admin claim
@@ -821,7 +1243,7 @@ async function submitAdminAuthStep1() {
             }, 1000);
         }
     } catch (err) {
-        if (msgEl) { msgEl.style.color = '#c00'; msgEl.textContent = 'Network error during verification'; }
+        if (msgEl) { msgEl.style.color = '#c00'; msgEl.textContent = 'Unable to connect to server. Please ensure the server is running by executing "npm start" in the project directory.'; }
         console.error('Admin auth error', err);
     }
 }
@@ -832,9 +1254,15 @@ async function submitAdminAuthStep2() {
     if (msgEl) { msgEl.style.color = '#333'; msgEl.textContent = 'CHECKING IF SUPERADMIN...'; }
 
     try {
+        const sessionId = localStorage.getItem('adminSessionId');
+        if (!sessionId) {
+            if (msgEl) { msgEl.style.color = '#c00'; msgEl.textContent = 'Session expired. Please restart admin authentication.'; }
+            return;
+        }
+
         // Verify super admin privileges
         const res = await fetch(apiUrl('/api/admin/verify-super-admin'), {
-            method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ sessionId })
         });
         if (!res.ok) {
             const body = await res.json().catch(()=>({}));
@@ -892,9 +1320,15 @@ async function submitAdminAuthStep3() {
     if (msgEl) { msgEl.style.color = '#333'; msgEl.textContent = 'Verifying password...'; }
 
     try {
+        const sessionId = localStorage.getItem('adminSessionId');
+        if (!sessionId) {
+            if (msgEl) { msgEl.style.color = '#c00'; msgEl.textContent = 'Session expired. Please restart admin authentication.'; }
+            return;
+        }
+
         // Verify the password matches the original
         const res = await fetch(apiUrl('/api/admin/verify-password'), {
-            method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ password: passwordConfirm })
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ password: passwordConfirm, sessionId })
         });
         if (!res.ok) {
             const body = await res.json().catch(()=>({}));

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apisam Beekeeping - Delivery Location</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="script.js" defer></script>
+    <script src="location-enhanced.js" defer></script>
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <img src="logo.png" alt="Apisam Beekeeping Logo">
+        </div>
+        <div id="navbar-container"></div>
+    </header>
+
+    <main>
+        <section class="location">
+            <h1>Select Delivery Location</h1>
+            <div class="location-container">
+                <div class="location-options">
+                    <h3>Choose Location Method:</h3>
+                    <button onclick="testAutoDetect()" class="location-btn">📍 Auto-Detect My Location</button>
+                    <button onclick="showMapSelection()" class="location-btn">🗺️ Select on Map</button>
+                    <button onclick="showManualEntry()" class="location-btn">✏️ Enter Address Manually</button>
+                </div>
+
+                <div id="auto-detect" style="display:none;">
+                    <h3>Auto-Detecting Location...</h3>
+                    <div id="detected-location"></div>
+                    <div id="auto-detect-map" style="height:400px;background:#f0f0f0;border:1px solid #ddd;display:none;position:relative;">
+                        <div id="draggable-marker" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:30px;cursor:move;">📍</div>
+                        <div style="position:absolute;bottom:10px;left:10px;background:rgba(255,255,255,0.9);padding:5px;border-radius:3px;font-size:12px;" id="marker-coords"></div>
+                    </div>
+                </div>
+
+                <div id="map-selection" style="display:none;">
+                    <h3>Select Location on Map</h3>
+                    <div id="map-container" style="height:400px;background:#f0f0f0;border:1px solid #ddd;display:flex;align-items:center;justify-content:center;">
+                        <p>Interactive Map (Demo)</p>
+                    </div>
+                    <div id="map-coordinates"></div>
+                </div>
+
+                <div id="manual-entry" style="display:none;">
+                    <h3>Enter Delivery Address</h3>
+                    <form id="address-form">
+                        <input type="text" id="street-address" placeholder="Street Address" required>
+                        <input type="text" id="city" placeholder="City" required>
+                        <input type="text" id="county" placeholder="County" required>
+                        <input type="text" id="postal-code" placeholder="Postal Code">
+                        <textarea id="delivery-notes" placeholder="Delivery instructions (optional)"></textarea>
+                    </form>
+                </div>
+
+                <div id="selected-location" style="display:none;">
+                    <h3>Selected Location:</h3>
+                    <div id="location-details"></div>
+                    <button onclick="proceedToPayment()" class="proceed-btn">Proceed to Payment</button>
+                    <button onclick="changeLocation()" class="change-btn">Change Location</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2023 Apisam Beekeeping. All rights reserved.</p>
+    </footer>
+</body>
+</html>
