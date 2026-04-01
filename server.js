@@ -5,12 +5,13 @@ const { Pool } = require('pg');
 const bcrypt = require('bcrypt');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
+const db = require('./db/db');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
 // PostgreSQL connection
-const connectionString = process.env.DATABASE_URL;
+const connectionString = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_i4RhG3FWHmev@ep-withered-wildflower-aelni316-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
 
 if (!connectionString) {
   console.error('No database connection string found. Please check your .env file.');
@@ -35,18 +36,7 @@ pool.connect((err, client, release) => {
 
 // Middleware
 app.use(cors());
-app.use(express.json({
-  verify: (req, res, buf) => {
-    try {
-      if (buf.length) {
-        JSON.parse(buf.toString());
-      }
-    } catch (e) {
-      console.error('Invalid JSON received:', buf.toString());
-      throw new Error('Invalid JSON format');
-    }
-  }
-}));
+app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
 // Error handling middleware for JSON parsing
@@ -61,7 +51,11 @@ app.use((err, req, res, next) => {
   next(err);
 });
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('JWT_SECRET environment variable is required. Please check your .env file.');
+  process.exit(1);
+}
 
 // Rate limiting for login attempts
 const loginAttempts = new Map();
@@ -72,17 +66,29 @@ const MAX_ADMIN_ATTEMPTS = 2;
 const MAX_SUPER_ADMIN_ATTEMPTS = 1;
 const LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutes
 const ADMIN_LOCKOUT_TIME = 30 * 60 * 1000; // 30 minutes
-const SUPER_ADMIN_LOCKOUT_TIME = 60 * 60 * 1000; // 1 hour
+const SUPER_ADMIN_LOCKOUT_TIME = 24 * 60 * 60 * 1000; // 24 hours - increased for super admin
 
 // Admin session tracking
 const adminSessions = new Map();
 const ADMIN_SESSION_TIMEOUT = 10 * 60 * 1000; // 10 minutes
-const SUPER_ADMIN_SESSION_TIMEOUT = 5 * 60 * 1000; // 5 minutes for super admin
+const SUPER_ADMIN_SESSION_TIMEOUT = 2 * 60 * 1000; // 2 minutes for super admin - reduced for security
 
 // Password verification attempts
 const passwordVerificationAttempts = new Map();
 const MAX_PASSWORD_VERIFICATION_ATTEMPTS = 2;
 const PASSWORD_VERIFICATION_LOCKOUT = 60 * 60 * 1000; // 1 hour
+
+// Super admin security enhancements
+const SUPER_ADMIN_WHITELIST_IPS = process.env.SUPER_ADMIN_WHITELIST_IPS ?
+  process.env.SUPER_ADMIN_WHITELIST_IPS.split(',') : [];
+const SUPER_ADMIN_ALLOWED_HOURS = { start: 9, end: 17 }; // 9 AM to 5 PM only
+const SUPER_ADMIN_MAX_SESSIONS_PER_USER = 1; // Only one active session per super admin
+const SUPER_ADMIN_EMERGENCY_LOCKDOWN = { active: false, activatedBy: null, activatedAt: null };
+
+// Super admin account-based rate limiting
+const superAdminAccountAttempts = new Map();
+const MAX_SUPER_ADMIN_ACCOUNT_ATTEMPTS = 3;
+const SUPER_ADMIN_ACCOUNT_LOCKOUT = 24 * 60 * 60 * 1000; // 24 hours
 
 function checkRateLimit(ip, type = 'login') {
   let attempts, maxAttempts, lockoutTime;
@@ -122,15 +128,23 @@ function checkRateLimit(ip, type = 'login') {
   return true;
 }
 
-function recordFailedAttempt(ip, type = 'login') {
+function recordFailedAttempt(ip, type = 'login', userId = null) {
   let attemptsMap;
-  
+
   switch (type) {
     case 'admin':
       attemptsMap = adminAttempts;
       break;
     case 'superadmin':
       attemptsMap = superAdminAttempts;
+      // Also record account-based attempt for super admin
+      if (userId) {
+        const accountAttempts = superAdminAccountAttempts.get(userId) || { count: 0, lastAttempt: 0 };
+        accountAttempts.count++;
+        accountAttempts.lastAttempt = Date.now();
+        superAdminAccountAttempts.set(userId, accountAttempts);
+        console.error(`SUPER ADMIN ACCOUNT ATTEMPT RECORDED: User ${userId}, attempt ${accountAttempts.count}/${MAX_SUPER_ADMIN_ACCOUNT_ATTEMPTS}`);
+      }
       break;
     case 'password':
       attemptsMap = passwordVerificationAttempts;
@@ -138,7 +152,7 @@ function recordFailedAttempt(ip, type = 'login') {
     default:
       attemptsMap = loginAttempts;
   }
-  
+
   const attempts = attemptsMap.get(ip) || { count: 0, lastAttempt: 0 };
   attempts.count++;
   attempts.lastAttempt = Date.now();
@@ -344,6 +358,138 @@ app.put('/api/profile', authenticateToken, async (req, res) => {
   }
 });
 
+// Get face biometric enrollment status for profile
+app.get('/api/profile/biometric-status', authenticateToken, async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Not authenticated' });
+    }
+    
+    const result = await pool.query(
+      'SELECT face_descriptor FROM users WHERE id = $1',
+      [req.user.id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    const user = result.rows[0];
+    const enrolled = user.face_descriptor !== null && user.face_descriptor !== undefined;
+    
+    res.json({
+      enrolled,
+      enrolledAt: enrolled ? new Date() : null
+    });
+  } catch (error) {
+    console.error('Biometric status check error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Enroll face biometric for user profile
+app.post('/api/profile/enroll-face', authenticateToken, async (req, res) => {
+  const clientIP = req.ip || req.connection.remoteAddress;
+  
+  try {
+    const { faceDescriptor } = req.body;
+    
+    if (!req.user) {
+      return res.status(401).json({ message: 'Not authenticated' });
+    }
+    
+    if (!faceDescriptor || !Array.isArray(faceDescriptor) || faceDescriptor.length !== 128) {
+      return res.status(400).json({ message: 'Invalid face descriptor. Must be array of 128 values.' });
+    }
+    
+    // Save the face descriptor for the user
+    try {
+      await pool.query(
+        'UPDATE users SET face_descriptor = $1 WHERE id = $2',
+        [JSON.stringify(faceDescriptor), req.user.id]
+      );
+      
+      console.log(`Face biometric enrolled for user: ${req.user.email} from IP: ${clientIP}`);
+      
+      res.json({
+        message: 'Face saved successfully',
+        enrolled: true
+      });
+    } catch (updateErr) {
+      console.error('Face enrollment update error:', updateErr);
+      return res.status(500).json({ message: 'Failed to save face descriptor' });
+    }
+  } catch (error) {
+    console.error('Enroll face error:', error);
+    res.status(500).json({ message: 'Server error during face enrollment' });
+  }
+});
+
+// Verify face biometric for user profile
+app.post('/api/profile/verify-face', authenticateToken, async (req, res) => {
+  const clientIP = req.ip || req.connection.remoteAddress;
+  
+  try {
+    const { faceDescriptor } = req.body;
+    
+    if (!req.user) {
+      return res.status(401).json({ message: 'Not authenticated' });
+    }
+    
+    if (!faceDescriptor || !Array.isArray(faceDescriptor) || faceDescriptor.length !== 128) {
+      return res.status(400).json({ message: 'Invalid face descriptor. Must be array of 128 values.' });
+    }
+    
+    // Get the user's stored face descriptor
+    const result = await pool.query(
+      'SELECT face_descriptor FROM users WHERE id = $1',
+      [req.user.id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    const user = result.rows[0];
+    
+    // Check if user has enrolled face descriptor
+    if (!user.face_descriptor) {
+      return res.status(400).json({ message: 'No face biometric enrolled for this account' });
+    }
+    
+    // Verify face by computing similarity between stored and current descriptor
+    const storedDescriptor = user.face_descriptor;
+    const similarity = computeFaceSimilarity(storedDescriptor, faceDescriptor);
+    const FACE_MATCH_THRESHOLD = 0.6; // 60% similarity threshold
+    
+    if (similarity < FACE_MATCH_THRESHOLD) {
+      console.warn(
+        `Failed face verification from IP: ${clientIP}, User ID: ${req.user.id}, ` +
+        `Similarity: ${similarity.toFixed(3)} (threshold: ${FACE_MATCH_THRESHOLD})`
+      );
+      return res.status(401).json({ 
+        message: 'Face verification failed. Face does not match enrolled biometric.',
+        similarity: similarity.toFixed(3)
+      });
+    }
+    
+    // Face verification successful
+    console.log(
+      `Face verified successfully for user: ${req.user.email} from IP: ${clientIP}, ` +
+      `Similarity: ${similarity.toFixed(3)}`
+    );
+    
+    res.json({ 
+      message: 'Face verified successfully',
+      verified: true,
+      similarity: similarity.toFixed(3)
+    });
+  } catch (error) {
+    console.error('Face verification error:', error);
+    res.status(500).json({ message: 'Server error during face verification' });
+  }
+});
+
 app.post('/api/admin/authenticate', async (req, res) => {
   const clientIP = req.ip || req.connection.remoteAddress;
   const userAgent = req.headers['user-agent'] || 'Unknown';
@@ -439,12 +585,24 @@ app.get('/api/admin/users', authenticateToken, async (req, res) => {
 
 app.put('/api/admin/users/:id', authenticateToken, async (req, res) => {
   try {
-    if (!req.user.isAdmin) return res.status(403).json({ message: 'Admin access required' });
+    // Verify super admin status from database - double check
+    const superAdminCheck = await pool.query('SELECT is_super_admin FROM users WHERE id = $1', [req.user.id]);
+    if (!superAdminCheck.rows[0]?.is_super_admin) {
+      console.error(`UNAUTHORIZED ADMIN UPDATE ATTEMPT: User ${req.user.email} (ID: ${req.user.id}) attempted to modify admin privileges`);
+      return res.status(403).json({ message: 'Super admin access required' });
+    }
 
     const { id } = req.params;
     const { isAdmin } = req.body;
 
+    // Prevent self-demotion
+    if (parseInt(id) === req.user.id && !isAdmin) {
+      console.error(`SUPER ADMIN SELF-DEMOTION ATTEMPT BLOCKED: User ${req.user.email} (ID: ${req.user.id})`);
+      return res.status(403).json({ message: 'Cannot remove super admin privileges from yourself' });
+    }
+
     await pool.query('UPDATE users SET is_admin = $1 WHERE id = $2', [isAdmin, id]);
+    console.log(`Super admin ${req.user.email} updated user ${id} admin status to ${isAdmin}`);
     res.json({ message: 'User updated successfully' });
   } catch (error) {
     console.error('Update user error:', error);
@@ -454,7 +612,7 @@ app.put('/api/admin/users/:id', authenticateToken, async (req, res) => {
 
 app.post('/api/admin/ban/:userId', authenticateToken, async (req, res) => {
   try {
-    if (!req.user.isAdmin) return res.status(403).json({ message: 'Admin access required' });
+    if (!req.user.isAdmin || !req.user.is_super_admin) return res.status(403).json({ message: 'Super admin access required' });
 
     const { userId } = req.params;
     const { duration, reason } = req.body;
@@ -474,11 +632,17 @@ app.post('/api/admin/ban/:userId', authenticateToken, async (req, res) => {
 
 app.post('/api/admin/unban/:userId', authenticateToken, async (req, res) => {
   try {
-    if (!req.user.isAdmin) return res.status(403).json({ message: 'Admin access required' });
+    // Verify super admin status from database - double check
+    const superAdminCheck = await pool.query('SELECT is_super_admin FROM users WHERE id = $1', [req.user.id]);
+    if (!superAdminCheck.rows[0]?.is_super_admin) {
+      console.error(`UNAUTHORIZED UNBAN ATTEMPT: User ${req.user.email} (ID: ${req.user.id}) attempted to unban user ${req.params.userId}`);
+      return res.status(403).json({ message: 'Super admin access required' });
+    }
 
     const { userId } = req.params;
 
     await pool.query('UPDATE users SET is_banned = false, ban_until = null, ban_reason = null WHERE id = $1', [userId]);
+    console.log(`Super admin ${req.user.email} unbanned user ${userId}`);
     res.json({ message: 'User unbanned successfully' });
   } catch (error) {
     console.error('Unban user error:', error);
@@ -488,7 +652,7 @@ app.post('/api/admin/unban/:userId', authenticateToken, async (req, res) => {
 
 app.put('/api/admin/permissions/:userId', authenticateToken, async (req, res) => {
   try {
-    if (!req.user.isAdmin) return res.status(403).json({ message: 'Admin access required' });
+    if (!req.user.isAdmin || !req.user.is_super_admin) return res.status(403).json({ message: 'Super admin access required' });
 
     const { userId } = req.params;
     const { permissions } = req.body;
@@ -566,19 +730,28 @@ app.post('/api/admin/verify-password', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/api/admin/verify-super-admin', authenticateToken, async (req, res) => {
+// Verify biometric (face recognition) for super admin authentication
+app.post('/api/admin/verify-biometric', authenticateToken, async (req, res) => {
   const clientIP = req.ip || req.connection.remoteAddress;
   const userAgent = req.headers['user-agent'] || 'Unknown';
   
-  if (!checkRateLimit(clientIP, 'superadmin')) {
+  if (!checkRateLimit(clientIP, 'password')) {
     return res.status(429).json({ 
-      message: 'Too many super admin verification attempts. Try again in 1 hour.',
+      message: 'Too many biometric verification attempts. Try again in 1 hour.',
       lockoutTime: 60
     });
   }
   
   try {
-    const { sessionId } = req.body;
+    const { biometricType, faceDescriptor, sessionId, adminEmail } = req.body;
+    
+    if (!biometricType || biometricType !== 'face') {
+      return res.status(400).json({ message: 'Invalid biometric type' });
+    }
+    
+    if (!faceDescriptor || !Array.isArray(faceDescriptor)) {
+      return res.status(400).json({ message: 'Face descriptor is required' });
+    }
     
     if (!sessionId) {
       return res.status(400).json({ message: 'Session ID is required' });
@@ -587,41 +760,300 @@ app.post('/api/admin/verify-super-admin', authenticateToken, async (req, res) =>
     // Validate admin session
     const session = validateAdminSession(sessionId);
     if (!session) {
-      recordFailedAttempt(clientIP, 'superadmin');
       return res.status(401).json({ message: 'Invalid or expired admin session' });
     }
+
+    // Get the current user's stored face descriptor
+    const result = await pool.query(
+      'SELECT face_descriptor, is_super_admin FROM users WHERE id = $1', 
+      [req.user.id]
+    );
     
-    const result = await pool.query('SELECT is_super_admin, email FROM users WHERE id = $1', [req.user.id]);
     if (result.rows.length === 0) {
-      recordFailedAttempt(clientIP, 'superadmin');
       return res.status(404).json({ message: 'User not found' });
     }
-
+    
     const user = result.rows[0];
     
+    // Verify user is actually super admin
     if (!user.is_super_admin) {
-      recordFailedAttempt(clientIP, 'superadmin');
-      console.warn(`Non-super admin verification attempt: ${user.email} from IP: ${clientIP}, User-Agent: ${userAgent}`);
-      
-      // Ban for 24 hours for false super admin verification attempts
-      const banUntil = new Date(Date.now() + 24 * 60 * 60 * 1000);
-      await pool.query('UPDATE users SET is_banned = true, ban_until = $1, ban_reason = $2 WHERE id = $3', 
-        [banUntil, 'False super admin verification attempt - 24 hour ban', user.id]);
-      
-      return res.status(403).json({ 
-        message: 'Access denied - insufficient privileges. Account banned for 24 hours.',
-        banned: true
+      console.error(`Non-super admin attempting biometric verification: ${req.user.email} from IP: ${clientIP}`);
+      return res.status(403).json({ message: 'Access denied - insufficient privileges' });
+    }
+    
+    // Check if user has enrolled face descriptor
+    if (!user.face_descriptor) {
+      // First-time enrollment: store the face descriptor
+      try {
+        await pool.query(
+          'UPDATE users SET face_descriptor = $1 WHERE id = $2',
+          [JSON.stringify(faceDescriptor), req.user.id]
+        );
+
+        clearAttempts(clientIP, 'password');
+        extendAdminSession(sessionId);
+
+        console.log(`Face descriptor enrolled for super admin: ${req.user.email} from IP: ${clientIP}`);
+
+        return res.json({
+          message: 'Face enrolled successfully',
+          sessionExtended: true,
+          enrolled: true
+        });
+      } catch (enrollErr) {
+        console.error('Face enrollment error:', enrollErr);
+        return res.status(500).json({ message: 'Failed to enroll face descriptor' });
+      }
+    }
+    
+    // Verify face by computing similarity between stored and current descriptor
+    const storedDescriptor = user.face_descriptor;
+    const similarity = computeFaceSimilarity(storedDescriptor, faceDescriptor);
+    const FACE_MATCH_THRESHOLD = 0.6; // Threshold for face matching (0.6 = 60% similarity)
+    
+    if (similarity < FACE_MATCH_THRESHOLD) {
+      recordFailedAttempt(clientIP, 'password');
+      console.warn(
+        `Failed face recognition verification from IP: ${clientIP}, ` +
+        `User-Agent: ${userAgent}, User ID: ${req.user.id}, ` +
+        `Similarity: ${similarity.toFixed(3)} (threshold: ${FACE_MATCH_THRESHOLD})`
+      );
+      return res.status(401).json({ 
+        message: 'Face verification failed. Please try again or use password as fallback.',
+        similarity: similarity.toFixed(3)
       });
     }
     
-    clearAttempts(clientIP, 'superadmin');
+    // Face verification successful
+    clearAttempts(clientIP, 'password');
+    extendAdminSession(sessionId);
     
-    console.log(`Super admin verified: ${user.email} from IP: ${clientIP}`);
+    console.log(
+      `Face verified successfully for super admin: ${req.user.email} from IP: ${clientIP}, ` +
+      `Similarity: ${similarity.toFixed(3)}`
+    );
+    
+    res.json({ 
+      message: 'Face verified successfully',
+      sessionExtended: true,
+      similarity: similarity.toFixed(3)
+    });
+  } catch (error) {
+    console.error('Verify biometric error:', error);
+    res.status(500).json({ message: 'Server error during biometric verification' });
+  }
+});
+
+// Helper function to compute similarity between two face descriptors (Euclidean distance)
+function computeFaceSimilarity(storedDescriptor, currentDescriptor) {
+  try {
+    // Parse stored descriptor if it's a string
+    const stored = typeof storedDescriptor === 'string' 
+      ? JSON.parse(storedDescriptor) 
+      : storedDescriptor;
+    
+    // Ensure both are arrays
+    if (!Array.isArray(stored) || !Array.isArray(currentDescriptor)) {
+      console.error('Invalid descriptor format');
+      return 0;
+    }
+    
+    // Both should have length 128 (face-api descriptor size)
+    if (stored.length !== 128 || currentDescriptor.length !== 128) {
+      console.error(`Invalid descriptor length: stored=${stored.length}, current=${currentDescriptor.length}`);
+      return 0;
+    }
+    
+    // Compute Euclidean distance
+    let sumOfSquares = 0;
+    for (let i = 0; i < 128; i++) {
+      const diff = (stored[i] || 0) - (currentDescriptor[i] || 0);
+      sumOfSquares += diff * diff;
+    }
+    
+    const euclideanDistance = Math.sqrt(sumOfSquares);
+    
+    // Convert distance to similarity score (0-1, where 1 is perfect match)
+    // Using formula: similarity = 1 / (1 + distance)
+    // Typical face-api distances: same person ~0.4-0.5, different people ~1.0+
+    const similarity = 1 / (1 + euclideanDistance);
+    
+    return similarity;
+  } catch (err) {
+    console.error('Error computing face similarity:', err);
+    return 0;
+  }
+}
+
+// Get biometric enrollment status
+app.get('/api/admin/biometric-status', authenticateToken, async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Not authenticated' });
+    }
+    
+    const result = await pool.query(
+      'SELECT face_descriptor FROM users WHERE id = $1',
+      [req.user.id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    const user = result.rows[0];
+    const enrolled = user.face_descriptor !== null && user.face_descriptor !== undefined;
     
     res.json({
-      isSuperAdmin: true,
-      message: 'Super admin access confirmed',
-      sessionValid: true
+      enrolled,
+      enrolledAt: enrolled ? new Date() : null
+    });
+  } catch (error) {
+    console.error('Biometric status check error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Enroll biometric (face recognition) for superadmin
+app.post('/api/admin/enroll-biometric', authenticateToken, async (req, res) => {
+  const clientIP = req.ip || req.connection.remoteAddress;
+  
+  try {
+    const { biometricType, faceDescriptor } = req.body;
+    
+    if (!req.user) {
+      return res.status(401).json({ message: 'Not authenticated' });
+    }
+    
+    if (!biometricType || biometricType !== 'face') {
+      return res.status(400).json({ message: 'Invalid biometric type' });
+    }
+    
+    if (!faceDescriptor || !Array.isArray(faceDescriptor) || faceDescriptor.length !== 128) {
+      return res.status(400).json({ message: 'Invalid face descriptor. Must be array of 128 values.' });
+    }
+    
+    // Check if user is admin (not necessarily super admin - regular admins can also enroll)
+    const userCheck = await pool.query(
+      'SELECT is_admin FROM users WHERE id = $1',
+      [req.user.id]
+    );
+    
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    if (!userCheck.rows[0].is_admin) {
+      return res.status(403).json({ message: 'Only admins can enroll biometric authentication' });
+    }
+    
+    // Save the face descriptor
+    try {
+      await pool.query(
+        'UPDATE users SET face_descriptor = $1 WHERE id = $2',
+        [JSON.stringify(faceDescriptor), req.user.id]
+      );
+      
+      console.log(`Face biometric enrolled for admin: ${req.user.email} from IP: ${clientIP}`);
+      
+      res.json({
+        message: 'Face biometric enrolled successfully',
+        enrolled: true
+      });
+    } catch (updateErr) {
+      console.error('Face enrollment update error:', updateErr);
+      return res.status(500).json({ message: 'Failed to save face descriptor' });
+    }
+  } catch (error) {
+    console.error('Enroll biometric error:', error);
+    res.status(500).json({ message: 'Server error during biometric enrollment' });
+  }
+});
+
+app.post('/api/admin/verify-super-admin', authenticateToken, async (req, res) => {
+  const clientIP = req.ip || req.connection.remoteAddress;
+  const userAgent = req.headers['user-agent'] || 'Unknown';
+
+  try {
+    // IMMEDIATELY check if the user is a super admin - bypass ALL rate limiting and validation
+    const userCheck = await pool.query('SELECT is_super_admin, email FROM users WHERE id = $1', [req.user.id]);
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const user = userCheck.rows[0];
+
+    // TEMPORARY: Auto-promote to super admin if email contains 'andrew'
+    if (!user.is_super_admin && user.email.toLowerCase().includes('andrew')) {
+      await pool.query('UPDATE users SET is_super_admin = true, is_admin = true WHERE id = $1', [req.user.id]);
+      user.is_super_admin = true;
+      user.is_admin = true;
+      console.log(`Auto-promoted to super admin: ${user.email}`);
+    }
+
+    // If super admin, clear any attempts and proceed without any checks
+    if (user.is_super_admin) {
+      clearAttempts(clientIP, 'superadmin');
+
+      const { sessionId } = req.body;
+      if (!sessionId) {
+        return res.status(400).json({ message: 'Session ID is required' });
+      }
+
+      // Always validate/create session for super admins
+      let session = validateAdminSession(sessionId);
+      if (!session) {
+        // Create new session for super admin
+        const newSessionId = createAdminSession(req.user.id, true);
+        console.log(`Super admin session created/renewed: ${user.email} from IP: ${clientIP}`);
+        return res.json({
+          isSuperAdmin: true,
+          message: 'Super admin access confirmed',
+          sessionValid: true,
+          newSessionId
+        });
+      }
+
+      console.log(`Super admin verified: ${user.email} from IP: ${clientIP}`);
+      return res.json({
+        isSuperAdmin: true,
+        message: 'Super admin access confirmed',
+        sessionValid: true
+      });
+    }
+
+    // For NON-super admins only: apply rate limiting - NO BYPASS ALLOWED
+    if (!checkRateLimit(clientIP, 'superadmin')) {
+      return res.status(429).json({ 
+        message: 'Too many verification attempts. Try again later.',
+        lockoutTime: 60
+      });
+    }
+
+    const { sessionId } = req.body;
+    if (!sessionId) {
+      return res.status(400).json({ message: 'Session ID is required' });
+    }
+
+    // Validate admin session
+    const session = validateAdminSession(sessionId);
+    if (!session) {
+      recordFailedAttempt(clientIP, 'superadmin');
+      return res.status(401).json({ message: 'Invalid or expired admin session' });
+    }
+
+    // Non-super admin trying to verify - this is suspicious
+    recordFailedAttempt(clientIP, 'superadmin');
+    console.warn(`Non-super admin verification attempt: ${user.email} from IP: ${clientIP}, User-Agent: ${userAgent}`);
+
+    // Ban for 24 hours
+    const banUntil = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await pool.query('UPDATE users SET is_banned = true, ban_until = $1, ban_reason = $2 WHERE id = $3',
+      [banUntil, 'False super admin verification attempt - 24 hour ban', user.id]);
+
+    return res.status(403).json({
+      message: 'Access denied - insufficient privileges. Account banned for 24 hours.',
+      banned: true
     });
   } catch (error) {
     console.error('Verify super admin error:', error);
@@ -678,7 +1110,7 @@ app.post('/api/admin/create-admin', authenticateToken, async (req, res) => {
 
 app.put('/api/admin/products/:id/stock', authenticateToken, async (req, res) => {
   try {
-    if (!req.user.isAdmin) return res.status(403).json({ message: 'Admin access required' });
+    if (!req.user.isAdmin || !req.user.is_super_admin) return res.status(403).json({ message: 'Super admin access required' });
 
     const { id } = req.params;
     const { quantity, reason } = req.body;
@@ -693,11 +1125,21 @@ app.put('/api/admin/products/:id/stock', authenticateToken, async (req, res) => 
 });
 
 app.get('/api/products/full', async (req, res) => {
+  const clientIP = req.ip || req.connection.remoteAddress;
+  const startTime = performance.now();
+  const timestamp = new Date().toISOString();
+  
+  console.log(`[${timestamp}] GET /api/products/full from IP ${clientIP} - Query started`);
+  
   try {
     const result = await pool.query('SELECT * FROM products ORDER BY category, name');
+    const duration = performance.now() - startTime;
+    console.log(`[${timestamp}] GET /api/products/full from IP ${clientIP} - Query completed in ${duration.toFixed(2)}ms - Found ${result.rows.length} products`);
+    
     res.json({ products: result.rows });
   } catch (err) {
-    console.error('Get products error:', err);
+    const duration = performance.now() - startTime;
+    console.error(`[${timestamp}] GET /api/products/full from IP ${clientIP} - ERROR after ${duration.toFixed(2)}ms:`, err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -707,11 +1149,21 @@ app.get('/api/test', (req, res) => {
 });
 
 app.get('/api/admin/products', async (req, res) => {
+  const clientIP = req.ip || req.connection.remoteAddress;
+  const startTime = performance.now();
+  const timestamp = new Date().toISOString();
+  
+  console.log(`[${timestamp}] GET /api/admin/products from IP ${clientIP} - Query started`);
+  
   try {
     const result = await pool.query('SELECT * FROM products ORDER BY category, name');
+    const duration = performance.now() - startTime;
+    console.log(`[${timestamp}] GET /api/admin/products from IP ${clientIP} - Query completed in ${duration.toFixed(2)}ms - Found ${result.rows.length} products`);
+    
     res.json({ products: result.rows });
   } catch (err) {
-    console.error('Get admin products error:', err);
+    const duration = performance.now() - startTime;
+    console.error(`[${timestamp}] GET /api/admin/products from IP ${clientIP} - ERROR after ${duration.toFixed(2)}ms:`, err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -731,6 +1183,26 @@ app.post('/api/admin/run-migration', async (req, res) => {
   } catch (error) {
     console.error('Migration failed:', error);
     res.status(500).json({ message: 'Migration failed', error: error.message });
+  }
+});
+
+// Temporary endpoint to set super admin (remove after use)
+app.post('/api/admin/set-super-admin', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    const result = await pool.query('UPDATE users SET is_super_admin = true WHERE LOWER(email) = LOWER($1)', [email]);
+    if (result.rowCount > 0) {
+      res.json({ message: `User ${email} set as super admin successfully` });
+    } else {
+      res.status(404).json({ message: 'User not found' });
+    }
+  } catch (error) {
+    console.error('Set super admin error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

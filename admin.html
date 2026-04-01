@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Apisam Beekeeping - Admin</title>
     <link rel="stylesheet" href="style.css">
+    <script async src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0"></script>
+    <script async src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-api@0.0.7"></script>
     <script src="script.js" defer></script>
 </head>
 <body>
@@ -18,7 +20,7 @@
     <main>
         <section class="admin">
             <h1><span id="admin-dashboard-title-text">Admin Dashboard</span> <span id="admin-timer" style="float:right;font-size:0.8em;color:#f39c12;background:rgba(0,0,0,0.1);padding:5px 10px;border-radius:5px;"></span></h1>
-            <div id="admin-auth-portal" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.55);z-index:9999;">
+background:rgba(0,0,0,0.3);backdrop-filter:blur(8px);z-index:9999;">
                 <div style="background:#fff;padding:20px;border-radius:8px;max-width:500px;width:100%;box-shadow:0 8px 24px rgba(0,0,0,0.4);">
                     <div id="admin-auth-check" style="font-weight:700;margin-bottom:8px;">CHECKING IF YOU ARE ADMIN...</div>
 
@@ -48,11 +50,19 @@
                         </form>
                     </div>
 
-                    <!-- Step 3: Password Verification -->
+                    <!-- Step 3: Password Verification with Face Recognition -->
                     <div id="admin-auth-form-step3" style="display:none; margin-top:6px;">
-                        <h3 style="margin-top:0; color:#28a745;">🔒 Password Verification</h3>
-                        <p>For security purposes, please re-enter your account password.</p>
-                        <form id="admin-auth-step3" onsubmit="event.preventDefault(); submitAdminAuthStep3();">
+                        <h3 style="margin-top:0; color:#28a745;">🔒 Biometric Authentication</h3>
+                        <p>Complete biometric verification as the superadmin. Choose method:</p>
+                        
+                        <!-- Tab Selection -->
+                        <div style="display:flex;gap:8px;margin-bottom:12px;border-bottom:2px solid #ddd;">
+                            <button type="button" onclick="switchAuthMethod('password')" id="tab-password" style="flex:1;padding:8px;background:#e8e8e8;border:none;cursor:pointer;font-weight:bold;">Password</button>
+                            <button type="button" onclick="switchAuthMethod('face')" id="tab-face" style="flex:1;padding:8px;background:#f0f0f0;border:none;cursor:pointer;">Face Recognition</button>
+                        </div>
+                        
+                        <!-- Password Verification -->
+                        <form id="admin-auth-step3" style="display:block;" onsubmit="event.preventDefault(); submitAdminAuthStep3();">
                             <input type="password" id="admin-auth-password-confirm" placeholder="Re-enter your password" required style="display:block; margin-bottom:8px; width:100%; padding:8px;">
                             <div style="display:flex;gap:8px;align-items:center;">
                                 <button type="button" onclick="backToStep2()">Back</button>
@@ -60,6 +70,25 @@
                             </div>
                             <div id="admin-auth-message-step3" style="margin-top:8px;color:#c00;"></div>
                         </form>
+                        
+                        <!-- Face Recognition Verification -->
+                        <div id="face-recognition-form" style="display:none;">
+                            <p style="font-size:0.9em;color:#666;">Enable your camera and position your face in the center.</p>
+                            <div style="background:#f5f5f5;padding:12px;border-radius:8px;margin-bottom:12px;text-align:center;">
+                                <video id="face-detection-video" style="width:100%;max-width:400px;border-radius:8px;border:2px solid #ddd;margin-bottom:8px;"></video>
+                                <canvas id="face-detection-canvas" style="display:none;"></canvas>
+                                <div id="face-status" style="font-size:0.9em;color:#666;margin-top:8px;">Initializing camera...</div>
+                            </div>
+                            <div style="display:flex;gap:8px;align-items:center;flex-direction:column;width:100%;">
+                                <button type="button" id="start-face-scan" onclick="startFaceScan()" style="width:100%;padding:8px;background:#28a745;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:bold;">Start Face Scan</button>
+                                <button type="button" id="verify-face-btn" onclick="verifyFaceRecognition()" style="width:100%;padding:8px;background:#007bff;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:bold;display:none;">Verify Face</button>
+                                <button type="button" onclick="stopFaceScan()" style="width:100%;padding:8px;background:#6c757d;color:white;border:none;border-radius:4px;cursor:pointer;">Cancel</button>
+                            </div>
+                            <div id="admin-auth-message-face" style="margin-top:8px;color:#c00;font-size:0.9em;"></div>
+                        </div>
+                        
+                        <!-- Fallback to password button -->
+                        <button type="button" onclick="switchAuthMethod('password')" style="width:100%;margin-top:12px;padding:6px;background:transparent;color:#007bff;border:1px solid #007bff;border-radius:4px;cursor:pointer;font-size:0.9em;">Use Password Instead</button>
                     </div>
 
 
@@ -185,6 +214,17 @@
                             <button onclick="revokeAllSessions()">Revoke All Sessions</button>
                         </div>
                         <div class="feature-section">
+                            <h3>Biometric Authentication</h3>
+                            <div style="background: rgba(255,255,255,0.8); padding: 15px; border-radius: 8px; margin-bottom: 10px;">
+                                <p style="margin: 0 0 10px 0; font-size: 0.9em; color: #666;">Configure facial recognition for enhanced superadmin security.</p>
+                                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                    <button onclick="showBiometricManagement()" style="background: linear-gradient(135deg, #28a745 0%, #2ecc71 100%); color: white; font-weight: bold; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">🔐 Manage Face Recognition</button>
+                                    <button onclick="checkBiometricStatus()" style="background: #007bff; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">Check Status</button>
+                                </div>
+                                <div id="biometric-quick-status" style="margin-top: 10px; font-size: 0.9em; color: #666;"></div>
+                            </div>
+                        </div>
+                        <div class="feature-section">
                             <h3>Database Operations</h3>
                             <button onclick="backupDatabase()">Backup Database</button>
                             <button onclick="optimizeDatabase()">Optimize Database</button>
@@ -204,6 +244,40 @@
             </div>
         </section>
     </main>
+
+    <!-- Biometric Management Modal -->
+    <div id="biometric-management-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;align-items:center;justify-content:center;flex-direction:column;">
+        <div style="background:#fff;padding:30px;border-radius:8px;max-width:600px;width:90%;box-shadow:0 8px 24px rgba(0,0,0,0.4);">
+            <h2 style="margin-top:0;">🔐 Biometric Authentication Management</h2>
+            
+            <div style="margin-bottom:20px;padding:15px;background:#f0f8ff;border-left:4px solid #007bff;border-radius:4px;">
+                <p style="margin:0;font-size:0.95em;">Enroll or re-enroll your face for biometric authentication. This provides an additional security layer for superadmin access.</p>
+            </div>
+            
+            <div id="biometric-status" style="margin-bottom:20px;padding:15px;background:#f5f5f5;border-radius:4px;">
+                <p><strong>Current Status:</strong> <span id="biometric-status-text">Checking...</span></p>
+                <p id="biometric-last-updated" style="font-size:0.9em;color:#666;margin:5px 0 0 0;"></p>
+            </div>
+            
+            <div style="margin-bottom:20px;">
+                <h3 style="margin-top:0;">Face Enrollment</h3>
+                <div id="face-enroll-container" style="background:#f9f9f9;padding:15px;border-radius:4px;border:2px solid #ddd;">
+                    <video id="face-enroll-video" style="width:100%;max-width:400px;border-radius:8px;border:2px solid #ddd;margin-bottom:8px;"></video>
+                    <canvas id="face-enroll-canvas" style="display:none;"></canvas>
+                    <div id="face-enroll-status" style="font-size:0.9em;color:#666;margin:8px 0;text-align:center;min-height:20px;">Ready to enroll</div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+                        <button type="button" id="start-enroll-btn" onclick="startBiometricEnrollment()" style="padding:10px 20px;background:#28a745;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:bold;">Start Enrollment</button>
+                        <button type="button" id="capture-face-btn" onclick="captureBiometricFace()" style="padding:10px 20px;background:#007bff;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:bold;display:none;">Capture & Enroll</button>
+                        <button type="button" onclick="stopBiometricEnrollment()" style="padding:10px 20px;background:#6c757d;color:white;border:none;border-radius:4px;cursor:pointer;">Cancel</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="display:flex;gap:8px;justify-content:flex-end;">
+                <button type="button" onclick="closeBiometricManagement()" style="padding:10px 20px;background:#6c757d;color:white;border:none;border-radius:4px;cursor:pointer;">Close</button>
+            </div>
+        </div>
+    </div>
 
     <footer>
         <p>&copy; 2023 Apisam Beekeeping. All rights reserved.</p>

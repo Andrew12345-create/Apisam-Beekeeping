@@ -1,14 +1,1 @@
-
-# TODO for Dungeon Quest Game
-
-- [x] Define game classes (Player, Room, Monster, Item, Quest)
-- [x] Create game world with multiple rooms and connections
-- [x] Implement combat system
-- [x] Add item collection and inventory management
-- [x] Implement quests and progression
-- [x] Create main game loop with user input
-- [x] Test the game by running it
-- [x] Fix quest checking bug after monster defeat
-- [x] Add random crazy weapons when defeating monsters
-- [x] Add twists and random events in rooms
-- [x] Add special dragon defeat mechanic using inventory items
+# CSS Brightness & Visual Improvements\n\n## Steps:\n\n- [ ] 1. Create this TODO.md ✅\n- [ ] 2. Edit style.css: Lighten backgrounds, boost opacity/brightness, modernize shadows/gradients (focus shop products).\n- [ ] 3. Verify shop.html integration (products brighter, images pop).\n- [ ] 4. Update inline styles in admin.html/location.html.\n- [ ] 5. Test all pages (shop priority), use attempt_completion.\n\n**Priority**: Shop.html visuals (grid, images, buttons).
