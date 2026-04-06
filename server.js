@@ -1205,6 +1205,71 @@ app.post('/api/admin/set-super-admin', async (req, res) => {
   }
 });
 
+// Session management endpoints
+app.post('/api/admin/revoke-session', authenticateToken, async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+    if (!sessionId) return res.status(400).json({ message: 'Session ID is required' });
+    const revoked = revokeAdminSession(sessionId);
+    if (revoked) {
+      console.log(`Admin session revoked for user: ${req.user.email}`);
+      res.json({ message: 'Session revoked successfully' });
+    } else {
+      res.status(404).json({ message: 'Session not found' });
+    }
+  } catch (error) {
+    console.error('Revoke session error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.get('/api/admin/session-status', authenticateToken, async (req, res) => {
+  try {
+    const { sessionId } = req.query;
+    if (!sessionId) return res.status(400).json({ message: 'Session ID is required' });
+    const session = validateAdminSession(sessionId);
+    if (!session) return res.status(401).json({ message: 'Invalid or expired session' });
+    const timeRemaining = session.expiresAt - Date.now();
+    res.json({
+      valid: true,
+      timeRemaining,
+      minutesRemaining: Math.floor(timeRemaining / 60000),
+      secondsRemaining: Math.floor((timeRemaining % 60000) / 1000),
+      isSuperAdmin: session.isSuperAdmin
+    });
+  } catch (error) {
+    console.error('Session status error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.post('/api/admin/extend-session', authenticateToken, async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+    if (!sessionId) return res.status(400).json({ message: 'Session ID is required' });
+    const extended = extendAdminSession(sessionId);
+    extended ? res.json({ message: 'Session extended successfully' }) : res.status(404).json({ message: 'Session not found or expired' });
+  } catch (error) {
+    console.error('Extend session error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.get('/api/admin/security-audit', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT is_super_admin FROM users WHERE id = $1', [req.user.id]);
+    if (!result.rows[0]?.is_super_admin) return res.status(403).json({ message: 'Super admin access required' });
+    res.json({
+      activeAdminSessions: adminSessions.size,
+      loginAttempts: { regular: loginAttempts.size, admin: adminAttempts.size, superAdmin: superAdminAttempts.size, passwordVerification: passwordVerificationAttempts.size },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Security audit error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // M-Pesa Payment Endpoint
 app.post('/api/mpesa/stkpush', async (req, res) => {
   try {
@@ -1259,107 +1324,14 @@ app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
 
-// Serve static files AFTER all API routes so /api/* is never intercepted
+// ── Static files (MUST be after all API routes) ──
 app.use(express.static(path.join(__dirname)));
 
-// Catch-all: serve index.html for any non-API route (client-side navigation)
-app.get('*', (req, res) => {
-  if (!req.path.startsWith('/api')) {
+// ── Catch-all (MUST be last) ──
+app.use((req, res) => {
+  if (req.path.startsWith('/api')) {
+    res.status(404).json({ message: 'API route not found' });
+  } else {
     res.sendFile(path.join(__dirname, 'index.html'));
-  }
-});
-// Additional security endpoints
-app.post('/api/admin/revoke-session', authenticateToken, async (req, res) => {
-  try {
-    const { sessionId } = req.body;
-    if (!sessionId) {
-      return res.status(400).json({ message: 'Session ID is required' });
-    }
-    
-    const revoked = revokeAdminSession(sessionId);
-    if (revoked) {
-      console.log(`Admin session revoked for user: ${req.user.email}`);
-      res.json({ message: 'Session revoked successfully' });
-    } else {
-      res.status(404).json({ message: 'Session not found' });
-    }
-  } catch (error) {
-    console.error('Revoke session error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-app.get('/api/admin/session-status', authenticateToken, async (req, res) => {
-  try {
-    const { sessionId } = req.query;
-    if (!sessionId) {
-      return res.status(400).json({ message: 'Session ID is required' });
-    }
-    
-    const session = validateAdminSession(sessionId);
-    if (!session) {
-      return res.status(401).json({ message: 'Invalid or expired session' });
-    }
-    
-    const timeRemaining = session.expiresAt - Date.now();
-    const minutesRemaining = Math.floor(timeRemaining / 60000);
-    const secondsRemaining = Math.floor((timeRemaining % 60000) / 1000);
-    
-    res.json({
-      valid: true,
-      timeRemaining,
-      minutesRemaining,
-      secondsRemaining,
-      isSuperAdmin: session.isSuperAdmin
-    });
-  } catch (error) {
-    console.error('Session status error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-app.post('/api/admin/extend-session', authenticateToken, async (req, res) => {
-  try {
-    const { sessionId } = req.body;
-    if (!sessionId) {
-      return res.status(400).json({ message: 'Session ID is required' });
-    }
-    
-    const extended = extendAdminSession(sessionId);
-    if (extended) {
-      res.json({ message: 'Session extended successfully' });
-    } else {
-      res.status(404).json({ message: 'Session not found or expired' });
-    }
-  } catch (error) {
-    console.error('Extend session error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-// Security audit endpoint (super admin only)
-app.get('/api/admin/security-audit', authenticateToken, async (req, res) => {
-  try {
-    // Verify super admin
-    const result = await pool.query('SELECT is_super_admin FROM users WHERE id = $1', [req.user.id]);
-    if (!result.rows[0]?.is_super_admin) {
-      return res.status(403).json({ message: 'Super admin access required' });
-    }
-    
-    const auditData = {
-      activeAdminSessions: adminSessions.size,
-      loginAttempts: {
-        regular: loginAttempts.size,
-        admin: adminAttempts.size,
-        superAdmin: superAdminAttempts.size,
-        passwordVerification: passwordVerificationAttempts.size
-      },
-      timestamp: new Date().toISOString()
-    };
-    
-    res.json(auditData);
-  } catch (error) {
-    console.error('Security audit error:', error);
-    res.status(500).json({ message: 'Server error' });
   }
 });
