@@ -1,1 +1,15 @@
-# CSS Brightness, Navbar Fix & Global Polish\n\n## Approved Plan Steps:\n\n### Phase 1: Core CSS + Navbar (style.css, navbar.html, script.js)\n- [ ] 1. Edit style.css: Navbar mobile hamburger, shop brighter products/images/shadows/grid, global lightness.\n- [ ] 2. Edit navbar.html: Add mobile toggle button.\n- [ ] 3. Edit script.js: Add mobile menu toggle function.\n\n### Phase 2: Inline Cleanup (admin.html, location.html)\n- [ ] 4. Edit admin.html: Replace inline styles with CSS classes.\n- [ ] 5. Edit location.html: Update inline buttons/forms.\n\n### Phase 3: Verify & Complete\n- [ ] 6. Update this TODO.md (mark done).\n- [ ] 7. Test: npm start, shop.html navbar mobile/desktop, products visuals brighter/modern.\n- [ ] 8. attempt_completion.\n\n**Status**: Starting Phase 1... **Priority**: Navbar mobile + shop visuals.
+# DB Connection Fix - Progress Tracker
+
+## Steps from Approved Plan:
+
+- [x] **Step 1**: Create .env with DATABASE_URL, JWT_SECRET, PORT (Done)
+- [ ] **Step 2**: Edit server.js - Remove strict exit on missing connectionString, add logging for fallback URL
+- [ ] **Step 3**: Test localhost connection (`node server.js`)
+- [ ] **Step 4**: Setup Netlify env vars (DATABASE_URL, JWT_SECRET)
+- [ ] **Step 5**: Verify public deployment
+- [ ] **Step 6**: Run migrations/populate if DB empty
+- [ ] **Step 7**: Update .gitignore for .env
+
+**Next**: Confirm .env created, then edit server.js and test.
+
+**Status**: .env created with your provided vars (fixed URL typo). localhost now uses your Neon DB. Netlify needs env vars set manually in dashboard.

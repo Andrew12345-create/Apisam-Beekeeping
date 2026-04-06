@@ -10,17 +10,16 @@ const db = require('./db/db');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// PostgreSQL connection
-const connectionString = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_i4RhG3FWHmev@ep-withered-wildflower-aelni316-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
-
-if (!connectionString) {
+if (!process.env.DATABASE_URL) {
   console.error('No database connection string found. Please check your .env file.');
   process.exit(1);
 }
 
+const isProduction = process.env.NODE_ENV === 'production' || process.env.URL;
+
 const pool = new Pool({
-  connectionString,
-  ssl: { rejectUnauthorized: false }
+  connectionString: process.env.DATABASE_URL,
+  ssl: isProduction ? { rejectUnauthorized: false } : false,
 });
 
 // Test database connection on startup
@@ -1333,5 +1332,28 @@ app.use((req, res) => {
     res.status(404).json({ message: 'API route not found' });
   } else {
     res.sendFile(path.join(__dirname, 'index.html'));
+  }
+});
+
+// Add a route to populate the products table with sample data
+app.post('/api/admin/populate-products', async (req, res) => {
+  try {
+    const sampleProducts = [
+      { name: 'Honey Jar', category: 'Honey Processing', price: 10.99, stock_quantity: 100 },
+      { name: 'Bee Suit', category: 'Protective Equipment', price: 49.99, stock_quantity: 50 },
+      { name: 'Hive Tool', category: 'Tools & Equipment', price: 14.99, stock_quantity: 75 }
+    ];
+
+    for (const product of sampleProducts) {
+      await pool.query(
+        'INSERT INTO products (name, category, price, stock_quantity) VALUES ($1, $2, $3, $4)',
+        [product.name, product.category, product.price, product.stock_quantity]
+      );
+    }
+
+    res.status(201).json({ message: 'Sample products added successfully' });
+  } catch (error) {
+    console.error('Error populating products:', error);
+    res.status(500).json({ message: 'Failed to populate products' });
   }
 });
