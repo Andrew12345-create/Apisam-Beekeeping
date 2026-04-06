@@ -256,6 +256,11 @@ function isTokenExpired(token) {
 
 const API_PORT = 3000;
 let API_BASE = '';
+// Ensure API_BASE is set correctly for public servers
+if (!API_BASE && location.protocol !== 'file:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+    API_BASE = `${location.protocol}//${location.hostname}${location.port ? ':' + location.port : ''}`;
+    console.log('Public server detected, API_BASE set to:', API_BASE);
+}
 // file:// protocol → point at localhost:3000
 // Same-origin server (port 80/443 or any non-3000 public port) → use relative URLs (empty string)
 // Explicit localhost dev on a different port → point at localhost:3000
@@ -627,36 +632,23 @@ function createFloatingCartButton() {
     console.log('Floating cart button created');
 }
 
-// Shop products loading
 async function loadShopProducts() {
+    const shopEl = document.getElementById('shop-products');
     try {
-        // Test server connectivity first
-        console.log('Testing server connectivity...');
-        const testRes = await fetch(apiUrl('/api/test'));
-        if (!testRes.ok) {
-            throw new Error('Server not responding');
-        }
-        console.log('Server is responding');
-        
-        // Now fetch products
-        console.log('Fetching products from:', apiUrl('/api/products/full'));
         const res = await fetch(apiUrl('/api/products/full'));
-        if (res.ok) {
-            const data = await res.json();
-            console.log('Database products received:', data.products?.length || 0, 'products');
-            if (data.products && data.products.length > 0) {
-                console.log('First product:', data.products[0]);
-                displayShopProducts(data.products);
-            } else {
-                document.getElementById('shop-products').innerHTML = 'No products found in database';
-            }
+        if (!res.ok) {
+            shopEl.innerHTML = `<p style="text-align:center;color:#e74c3c;">Failed to load products (${res.status}). Please try refreshing.</p>`;
+            return;
+        }
+        const data = await res.json();
+        if (data.products && data.products.length > 0) {
+            displayShopProducts(data.products);
         } else {
-            console.error('Failed to fetch products:', res.status, res.statusText);
-            document.getElementById('shop-products').innerHTML = `Error loading products: ${res.status}`;
+            shopEl.innerHTML = '<p style="text-align:center;">No products found.</p>';
         }
     } catch (err) {
         console.error('Error loading products:', err);
-        document.getElementById('shop-products').innerHTML = `Error: ${err.message}`;
+        shopEl.innerHTML = '<p style="text-align:center;color:#e74c3c;">Unable to load products. Please check your connection and try again.</p>';
     }
 }
 
@@ -1415,7 +1407,7 @@ async function submitAdminAuthStep3() {
             const portal = document.getElementById('admin-auth-portal');
             const adminContent = document.getElementById('admin-content');
             if (portal) portal.style.display = 'none';
-            if (adminContent) adminContent.style.display = 'block';
+            if (adminContent)
             // load admin UI
             updateUserInterface();
             setTimeout(() => { loadAdminUsers(); loadProducts(); }, 300);
@@ -2582,7 +2574,6 @@ async function detectProfileVerifyFaceContinuously(video) {
             
             const { detection: box } = detection;
             const videoWidth = video.videoWidth;
-            const videoHeight = video.videoHeight;
             const faceWidth = box.width;
             const centerX = box.x + faceWidth / 2;
             const centerY = box.y + box.height / 2;
