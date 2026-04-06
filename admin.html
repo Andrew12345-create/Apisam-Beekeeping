@@ -3,284 +3,329 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Apisam Beekeeping - Admin</title>
+    <meta name="robots" content="noindex, nofollow">
+    <title>Apisam — Admin</title>
     <link rel="stylesheet" href="style.css">
-    <script async src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0"></script>
-    <script async src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-api@0.0.7"></script>
+    <link rel="stylesheet" href="admin.css">
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <script src="script.js" defer></script>
 </head>
-<body>
+<body class="admin-body">
+
     <header>
-        <div class="logo">
-            <img src="logo.png" alt="Apisam Beekeeping Logo">
-        </div>
         <div id="navbar-container"></div>
     </header>
 
     <main>
         <section class="admin">
-            <h1><span id="admin-dashboard-title-text">Admin Dashboard</span> <span id="admin-timer" style="float:right;font-size:0.8em;color:#f39c12;background:rgba(0,0,0,0.1);padding:5px 10px;border-radius:5px;"></span></h1>
-background:rgba(0,0,0,0.3);backdrop-filter:blur(8px);z-index:9999;">
-                <div style="background:#fff;padding:20px;border-radius:8px;max-width:500px;width:100%;box-shadow:0 8px 24px rgba(0,0,0,0.4);">
-                    <div id="admin-auth-check" style="font-weight:700;margin-bottom:8px;">CHECKING IF YOU ARE ADMIN...</div>
 
-                    <!-- Step 1: Admin Authentication -->
-                    <div id="admin-auth-form-step1" style="display:none; margin-top:6px;">
-                        <h3 style="margin-top:0; color:#d9534f;">🔐 Admin Authentication</h3>
-                        <p>Please enter your admin credentials to proceed.</p>
+            <!-- ── Auth Portal Overlay ── -->
+            <div id="admin-auth-portal" class="auth-portal-overlay">
+                <div class="auth-portal-card">
+
+                    <!-- Security badge -->
+                    <div class="auth-portal-badge">
+                        <span class="badge-icon">🔒</span>
+                        <span>Apisam Secure Admin</span>
+                    </div>
+
+                    <div id="admin-auth-check" class="auth-check-msg">Verifying access…</div>
+
+                    <!-- ── Step 1: Credentials ── -->
+                    <div id="admin-auth-form-step1" style="display:none;">
+                        <div class="auth-step-header">
+                            <span class="step-num">1</span>
+                            <div>
+                                <h3>Admin Authentication</h3>
+                                <p>Enter your admin credentials to continue.</p>
+                            </div>
+                        </div>
                         <form id="admin-auth-step1" onsubmit="event.preventDefault(); submitAdminAuthStep1();">
-                            <input type="email" id="admin-auth-email" placeholder="Admin email" required style="display:block; margin-bottom:8px; width:100%; padding:8px;">
-                            <input type="password" id="admin-auth-password" placeholder="Admin password" required style="display:block; margin-bottom:8px; width:100%; padding:8px;">
-                            <label style="display:block; margin-bottom:8px;"><input type="checkbox" id="is-super-admin-checkbox"> I am a super admin</label>
-                            <div style="display:flex;gap:8px;align-items:center;"><button type="submit">Verify Admin Credentials</button></div>
-                            <div id="admin-auth-message-step1" style="margin-top:8px;color:#c00;"></div>
+                            <div class="auth-field">
+                                <label>Email</label>
+                                <input type="email" id="admin-auth-email" placeholder="admin@apisam.com" required autocomplete="off">
+                            </div>
+                            <div class="auth-field">
+                                <label>Password</label>
+                                <input type="password" id="admin-auth-password" placeholder="••••••••" required autocomplete="off">
+                            </div>
+                            <label class="auth-checkbox">
+                                <input type="checkbox" id="is-super-admin-checkbox">
+                                <span>I am a super admin</span>
+                            </label>
+                            <button type="submit" class="auth-btn-primary">Verify Credentials</button>
+                            <div id="admin-auth-message-step1" class="auth-msg"></div>
                         </form>
                     </div>
 
-                    <!-- Step 2: Super Admin Verification -->
-                    <div id="admin-auth-form-step2" style="display:none; margin-top:6px;">
-                        <h3 style="margin-top:0; color:#f0ad4e;">🔑 Super Admin Verification</h3>
-                        <p>Confirming super admin access for: <span id="super-admin-email-display"></span> (<span id="super-admin-status-display"></span>)</p>
+                    <!-- ── Step 2: Super Admin Confirm ── -->
+                    <div id="admin-auth-form-step2" style="display:none;">
+                        <div class="auth-step-header">
+                            <span class="step-num step-warn">2</span>
+                            <div>
+                                <h3>Super Admin Verification</h3>
+                                <p>Confirming elevated access for <strong id="super-admin-email-display"></strong> &mdash; <span id="super-admin-status-display"></span></p>
+                            </div>
+                        </div>
+                        <div class="auth-security-notice">
+                            ⚠️ This action is logged. False super admin claims result in an immediate 24-hour ban.
+                        </div>
                         <form id="admin-auth-step2" onsubmit="event.preventDefault(); submitAdminAuthStep2();">
-                            <div style="display:flex;gap:8px;align-items:center;">
-                                <button type="button" onclick="backToStep1()">Back</button>
-                                <button type="submit">Confirm Super Admin Access</button>
+                            <div class="auth-btn-row">
+                                <button type="button" class="auth-btn-secondary" onclick="backToStep1()">← Back</button>
+                                <button type="submit" class="auth-btn-primary">Confirm Super Admin</button>
                             </div>
-                            <div id="admin-auth-message-step2" style="margin-top:8px;color:#c00;"></div>
+                            <div id="admin-auth-message-step2" class="auth-msg"></div>
                         </form>
                     </div>
 
-                    <!-- Step 3: Password Verification with Face Recognition -->
-                    <div id="admin-auth-form-step3" style="display:none; margin-top:6px;">
-                        <h3 style="margin-top:0; color:#28a745;">🔒 Biometric Authentication</h3>
-                        <p>Complete biometric verification as the superadmin. Choose method:</p>
-                        
-                        <!-- Tab Selection -->
-                        <div style="display:flex;gap:8px;margin-bottom:12px;border-bottom:2px solid #ddd;">
-                            <button type="button" onclick="switchAuthMethod('password')" id="tab-password" style="flex:1;padding:8px;background:#e8e8e8;border:none;cursor:pointer;font-weight:bold;">Password</button>
-                            <button type="button" onclick="switchAuthMethod('face')" id="tab-face" style="flex:1;padding:8px;background:#f0f0f0;border:none;cursor:pointer;">Face Recognition</button>
-                        </div>
-                        
-                        <!-- Password Verification -->
-                        <form id="admin-auth-step3" style="display:block;" onsubmit="event.preventDefault(); submitAdminAuthStep3();">
-                            <input type="password" id="admin-auth-password-confirm" placeholder="Re-enter your password" required style="display:block; margin-bottom:8px; width:100%; padding:8px;">
-                            <div style="display:flex;gap:8px;align-items:center;">
-                                <button type="button" onclick="backToStep2()">Back</button>
-                                <button type="submit">Verify Password</button>
+                    <!-- ── Step 3: Biometric / Password ── -->
+                    <div id="admin-auth-form-step3" style="display:none;">
+                        <div class="auth-step-header">
+                            <span class="step-num step-green">3</span>
+                            <div>
+                                <h3>Biometric Verification</h3>
+                                <p>Final security check. Choose your method.</p>
                             </div>
-                            <div id="admin-auth-message-step3" style="margin-top:8px;color:#c00;"></div>
+                        </div>
+
+                        <!-- Method tabs -->
+                        <div class="auth-tabs">
+                            <button type="button" id="tab-password" class="auth-tab active" onclick="switchAuthMethod('password')">🔑 Password</button>
+                            <button type="button" id="tab-face" class="auth-tab" onclick="switchAuthMethod('face')">👁 Face ID</button>
+                        </div>
+
+                        <!-- Password form -->
+                        <form id="admin-auth-step3" onsubmit="event.preventDefault(); submitAdminAuthStep3();">
+                            <div class="auth-field">
+                                <label>Re-enter Password</label>
+                                <input type="password" id="admin-auth-password-confirm" placeholder="••••••••" required autocomplete="off">
+                            </div>
+                            <button type="submit" class="auth-btn-primary">Verify &amp; Enter</button>
+                            <div id="admin-auth-message-step3" class="auth-msg"></div>
                         </form>
-                        
-                        <!-- Face Recognition Verification -->
+
+                        <!-- Face recognition form -->
                         <div id="face-recognition-form" style="display:none;">
-                            <p style="font-size:0.9em;color:#666;">Enable your camera and position your face in the center.</p>
-                            <div style="background:#f5f5f5;padding:12px;border-radius:8px;margin-bottom:12px;text-align:center;">
-                                <video id="face-detection-video" style="width:100%;max-width:400px;border-radius:8px;border:2px solid #ddd;margin-bottom:8px;"></video>
+                            <p class="auth-hint">Position your face in the centre of the camera frame.</p>
+                            <div class="face-video-wrap">
+                                <video id="face-detection-video" autoplay muted playsinline></video>
                                 <canvas id="face-detection-canvas" style="display:none;"></canvas>
-                                <div id="face-status" style="font-size:0.9em;color:#666;margin-top:8px;">Initializing camera...</div>
+                                <div id="face-status" class="face-status-msg">Initialising camera…</div>
                             </div>
-                            <div style="display:flex;gap:8px;align-items:center;flex-direction:column;width:100%;">
-                                <button type="button" id="start-face-scan" onclick="startFaceScan()" style="width:100%;padding:8px;background:#28a745;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:bold;">Start Face Scan</button>
-                                <button type="button" id="verify-face-btn" onclick="verifyFaceRecognition()" style="width:100%;padding:8px;background:#007bff;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:bold;display:none;">Verify Face</button>
-                                <button type="button" onclick="stopFaceScan()" style="width:100%;padding:8px;background:#6c757d;color:white;border:none;border-radius:4px;cursor:pointer;">Cancel</button>
+                            <div class="auth-btn-col">
+                                <button type="button" id="start-face-scan" class="auth-btn-green" onclick="startFaceScan()">▶ Start Face Scan</button>
+                                <button type="button" id="verify-face-btn" class="auth-btn-primary" onclick="verifyFaceRecognition()" style="display:none;">✓ Verify Face</button>
+                                <button type="button" class="auth-btn-secondary" onclick="stopFaceScan()">✕ Cancel</button>
                             </div>
-                            <div id="admin-auth-message-face" style="margin-top:8px;color:#c00;font-size:0.9em;"></div>
+                            <div id="admin-auth-message-face" class="auth-msg"></div>
                         </div>
-                        
-                        <!-- Fallback to password button -->
-                        <button type="button" onclick="switchAuthMethod('password')" style="width:100%;margin-top:12px;padding:6px;background:transparent;color:#007bff;border:1px solid #007bff;border-radius:4px;cursor:pointer;font-size:0.9em;">Use Password Instead</button>
                     </div>
-
 
                 </div>
             </div>
-            <div id="admin-content" class="admin-content">
-                <div class="admin-panel">
-                    <h2>User Management</h2>
-                    <div id="admin-controls" style="margin-bottom: 20px;">
-                        <button id="create-admin-btn" onclick="showCreateAdminForm()" style="display:none;">Create Admin</button>
-                        <button id="refresh-users-btn" onclick="loadAdminUsers()" style="margin-left:8px;">Refresh Users</button>
+            <!-- ── End Auth Portal ── -->
+
+            <!-- ── Dashboard (hidden until auth) ── -->
+            <div id="admin-content" class="admin-content" style="display:none;">
+
+                <!-- Dashboard header -->
+                <div class="admin-dashboard-header">
+                    <div>
+                        <h1 id="admin-dashboard-title-text">Admin Dashboard</h1>
+                        <p class="admin-subtitle">Apisam Beekeeping — Secure Control Panel</p>
                     </div>
-                    <div id="admin-users">
-                        <p>Loading users...</p>
+                    <div class="admin-session-badge">
+                        <span class="session-dot"></span>
+                        Session: <span id="admin-timer">--:--</span>
                     </div>
                 </div>
-                
+
+                <!-- User Management -->
                 <div class="admin-panel">
-                    <h2>Admin Actions</h2>
-                    <div id="admin-forms">
-                        <!-- Create Admin Form -->
-                        <div id="create-admin-form" style="display:none; margin-bottom:20px; padding:15px; border:1px solid #ddd;">
-                            <h3>Create New Admin</h3>
-                            <form onsubmit="createAdmin(event)">
+                    <div class="panel-header">
+                        <h2>👥 User Management</h2>
+                        <div class="panel-actions">
+                            <button id="create-admin-btn" class="btn-success" onclick="showCreateAdminForm()" style="display:none;">+ Create Admin</button>
+                            <button class="btn-outline" onclick="loadAdminUsers()">↻ Refresh</button>
+                        </div>
+                    </div>
+                    <div id="admin-users"><p class="loading-text">Loading users…</p></div>
+
+                    <!-- Create Admin Form -->
+                    <div id="create-admin-form" class="inline-form" style="display:none;">
+                        <h3>Create New Admin</h3>
+                        <form onsubmit="createAdmin(event)">
+                            <div class="form-row">
                                 <input type="text" id="admin-name" placeholder="Full Name" required>
                                 <input type="email" id="admin-email" placeholder="Email" required>
                                 <input type="password" id="admin-password" placeholder="Password" required>
-                                <div>
-                                    <label>Permissions:</label>
-                                    <label><input type="checkbox" value="user_management"> User Management</label>
-                                    <label><input type="checkbox" value="ban_users"> Ban Users</label>
-                                    <label><input type="checkbox" value="stock_management"> Stock Management</label>
-                                </div>
-                                <button type="submit">Create Admin</button>
-                                <button type="button" onclick="hideCreateAdminForm()">Cancel</button>
-                            </form>
-                        </div>
-                        
-                        <!-- Ban User Form -->
-                        <div id="ban-user-form" style="display:none; margin-bottom:20px; padding:15px; border:1px solid #ddd;">
-                            <h3>Ban User</h3>
-                            <form onsubmit="banUser(event)">
-                                <input type="hidden" id="ban-user-id">
-                                <input type="number" id="ban-duration" placeholder="Duration (minutes, leave empty for permanent)">
+                            </div>
+                            <div class="perm-checkboxes">
+                                <strong>Permissions:</strong>
+                                <label><input type="checkbox" value="user_management"> User Management</label>
+                                <label><input type="checkbox" value="ban_users"> Ban Users</label>
+                                <label><input type="checkbox" value="stock_management"> Stock Management</label>
+                            </div>
+                            <div class="form-btn-row">
+                                <button type="submit" class="btn-success">Create Admin</button>
+                                <button type="button" class="btn-outline" onclick="hideCreateAdminForm()">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Ban Form -->
+                    <div id="ban-user-form" class="inline-form" style="display:none;">
+                        <h3>🚫 Ban User</h3>
+                        <form onsubmit="banUser(event)">
+                            <input type="hidden" id="ban-user-id">
+                            <div class="form-row">
+                                <input type="number" id="ban-duration" placeholder="Duration in minutes (blank = permanent)">
                                 <input type="text" id="ban-reason" placeholder="Reason for ban" required>
-                                <button type="submit">Ban User</button>
-                                <button type="button" onclick="hideBanForm()">Cancel</button>
-                            </form>
-                        </div>
-                        
-                        <!-- Permissions Form -->
-                        <div id="permissions-form" style="display:none; margin-bottom:20px; padding:15px; border:1px solid #ddd;">
-                            <h3>Set Permissions</h3>
-                            <form onsubmit="setPermissions(event)">
-                                <input type="hidden" id="permissions-user-id">
-                                <div id="permissions-checkboxes">
-                                    <label><input type="checkbox" value="user_management"> User Management</label>
-                                    <label><input type="checkbox" value="ban_users"> Ban Users</label>
-                                    <label><input type="checkbox" value="stock_management"> Stock Management</label>
-                                </div>
-                                <button type="submit">Update Permissions</button>
-                                <button type="button" onclick="hidePermissionsForm()">Cancel</button>
-                            </form>
-                        </div>
+                            </div>
+                            <div class="form-btn-row">
+                                <button type="submit" class="btn-danger">Ban User</button>
+                                <button type="button" class="btn-outline" onclick="hideBanForm()">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Permissions Form -->
+                    <div id="permissions-form" class="inline-form" style="display:none;">
+                        <h3>🔑 Set Permissions</h3>
+                        <form onsubmit="setPermissions(event)">
+                            <input type="hidden" id="permissions-user-id">
+                            <div id="permissions-checkboxes" class="perm-checkboxes">
+                                <label><input type="checkbox" value="user_management"> User Management</label>
+                                <label><input type="checkbox" value="ban_users"> Ban Users</label>
+                                <label><input type="checkbox" value="stock_management"> Stock Management</label>
+                            </div>
+                            <div class="form-btn-row">
+                                <button type="submit" class="btn-success">Update Permissions</button>
+                                <button type="button" class="btn-outline" onclick="hidePermissionsForm()">Cancel</button>
+                            </div>
+                        </form>
                     </div>
                 </div>
-                
+
+                <!-- Stock Management -->
                 <div class="admin-panel">
-                    <h2>Stock Management</h2>
-                    <div id="admin-stock-panel">
-                        <div class="stock-controls" style="margin-bottom: 20px;">
-                            <button onclick="loadProducts()">Refresh Stock</button>
+                    <div class="panel-header">
+                        <h2>📦 Stock Management</h2>
+                        <div class="panel-actions">
                             <select id="category-filter" onchange="filterProducts()">
                                 <option value="">All Categories</option>
-                                <option value="Hives & Equipment">Hives & Equipment</option>
+                                <option value="Hives & Equipment">Hives &amp; Equipment</option>
                                 <option value="Hive Components">Hive Components</option>
                                 <option value="Protective Equipment">Protective Equipment</option>
-                                <option value="Tools & Equipment">Tools & Equipment</option>
+                                <option value="Tools & Equipment">Tools &amp; Equipment</option>
                                 <option value="Honey Processing">Honey Processing</option>
-                                <option value="Storage & Containers">Storage & Containers</option>
+                                <option value="Storage & Containers">Storage &amp; Containers</option>
                                 <option value="Specialty Items">Specialty Items</option>
                             </select>
+                            <button class="btn-outline" onclick="loadProducts()">↻ Refresh</button>
                         </div>
-                        <div id="products-table"></div>
+                    </div>
+                    <div id="products-table"></div>
 
-                        <!-- Stock Update Form -->
-                        <div id="stock-update-form" style="display:none; margin-top:20px; padding:15px; border:1px solid #ddd;">
-                            <h3>Update Stock</h3>
-                            <form onsubmit="updateStock(event)">
-                                <input type="hidden" id="update-product-id">
-                                <div>
-                                    <label>Product: <span id="update-product-name"></span></label>
-                                </div>
-                                <div>
-                                    <label>New Stock Quantity:</label>
-                                    <input type="number" id="update-quantity" min="0" required>
-                                </div>
-                                <div>
-                                    <label>Reason:</label>
-                                    <input type="text" id="update-reason" placeholder="Stock adjustment reason" required>
-                                </div>
-                                <button type="submit">Update Stock</button>
-                                <button type="button" onclick="hideStockForm()">Cancel</button>
-                            </form>
-                        </div>
+                    <!-- Stock Update Form -->
+                    <div id="stock-update-form" class="inline-form" style="display:none;">
+                        <h3>Update Stock — <span id="update-product-name"></span></h3>
+                        <form onsubmit="updateStock(event)">
+                            <input type="hidden" id="update-product-id">
+                            <div class="form-row">
+                                <input type="number" id="update-quantity" min="0" placeholder="New quantity" required>
+                                <input type="text" id="update-reason" placeholder="Reason for adjustment" required>
+                            </div>
+                            <div class="form-btn-row">
+                                <button type="submit" class="btn-success">Update Stock</button>
+                                <button type="button" class="btn-outline" onclick="hideStockForm()">Cancel</button>
+                            </div>
+                        </form>
                     </div>
                 </div>
 
-                <!-- Super Admin Advanced Features -->
-                <div id="super-admin-panel" class="admin-panel" style="display:none; border: 2px solid #28a745; background: linear-gradient(135deg, #f8fff8 0%, #e8f5e8 100%);">
-                    <h2 style="color: #28a745;">🔧 Advanced System Controls</h2>
-                    <div class="super-admin-features">
-                        <div class="feature-section">
-                            <h3>System Analytics</h3>
-                            <button onclick="viewSystemAnalytics()">View System Analytics</button>
+                <!-- Super Admin Panel -->
+                <div id="super-admin-panel" class="admin-panel super-panel" style="display:none;">
+                    <div class="panel-header">
+                        <h2>🔧 Advanced System Controls</h2>
+                        <span class="super-badge">Super Admin</span>
+                    </div>
+
+                    <div class="super-grid">
+                        <div class="super-section">
+                            <h3>📊 Analytics</h3>
+                            <button onclick="viewSystemAnalytics()">System Analytics</button>
                             <button onclick="exportUserData()">Export User Data</button>
                             <button onclick="viewSecurityAudit()">Security Audit</button>
                         </div>
-                        <div class="feature-section">
-                            <h3>Security Management</h3>
-                            <button onclick="viewSecurityLogs()">View Security Logs</button>
+                        <div class="super-section">
+                            <h3>🛡 Security</h3>
+                            <button onclick="viewSecurityLogs()">Security Logs</button>
                             <button onclick="manageSystemSettings()">System Settings</button>
-                            <button onclick="revokeAllSessions()">Revoke All Sessions</button>
+                            <button onclick="revokeAllSessions()" class="btn-danger-soft">Revoke All Sessions</button>
                         </div>
-                        <div class="feature-section">
-                            <h3>Biometric Authentication</h3>
-                            <div style="background: rgba(255,255,255,0.8); padding: 15px; border-radius: 8px; margin-bottom: 10px;">
-                                <p style="margin: 0 0 10px 0; font-size: 0.9em; color: #666;">Configure facial recognition for enhanced superadmin security.</p>
-                                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                                    <button onclick="showBiometricManagement()" style="background: linear-gradient(135deg, #28a745 0%, #2ecc71 100%); color: white; font-weight: bold; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">🔐 Manage Face Recognition</button>
-                                    <button onclick="checkBiometricStatus()" style="background: #007bff; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">Check Status</button>
-                                </div>
-                                <div id="biometric-quick-status" style="margin-top: 10px; font-size: 0.9em; color: #666;"></div>
-                            </div>
+                        <div class="super-section">
+                            <h3>👁 Face Biometrics</h3>
+                            <p class="super-hint">Manage facial recognition for super admin login.</p>
+                            <button class="btn-success" onclick="showBiometricManagement()">🔐 Manage Face ID</button>
+                            <button onclick="checkBiometricStatus()">Check Status</button>
+                            <div id="biometric-quick-status" class="super-hint" style="margin-top:8px;"></div>
                         </div>
-                        <div class="feature-section">
-                            <h3>Database Operations</h3>
+                        <div class="super-section">
+                            <h3>🗄 Database</h3>
                             <button onclick="backupDatabase()">Backup Database</button>
-                            <button onclick="optimizeDatabase()">Optimize Database</button>
+                            <button onclick="optimizeDatabase()">Optimise Database</button>
                         </div>
-                        <div class="feature-section">
-                            <h3>Session Management</h3>
-                            <div id="session-info" style="margin: 10px 0; padding: 10px; background: rgba(255,255,255,0.7); border-radius: 5px;">
-                                <strong>Session Status:</strong> <span id="session-status">Loading...</span><br>
-                                <strong>Time Remaining:</strong> <span id="session-time">--:--</span><br>
-                                <strong>Session Type:</strong> <span id="session-type">--</span>
+                        <div class="super-section">
+                            <h3>⏱ Session</h3>
+                            <div class="session-info-box">
+                                <div><span>Status</span><strong id="session-status">—</strong></div>
+                                <div><span>Remaining</span><strong id="session-time">—</strong></div>
+                                <div><span>Type</span><strong id="session-type">—</strong></div>
                             </div>
                             <button onclick="extendCurrentSession()">Extend Session</button>
-                            <button onclick="revokeCurrentSession()">End Session</button>
+                            <button class="btn-danger-soft" onclick="revokeCurrentSession()">End Session</button>
                         </div>
                     </div>
                 </div>
+
             </div>
+            <!-- ── End Dashboard ── -->
+
         </section>
     </main>
 
     <!-- Biometric Management Modal -->
-    <div id="biometric-management-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;align-items:center;justify-content:center;flex-direction:column;">
-        <div style="background:#fff;padding:30px;border-radius:8px;max-width:600px;width:90%;box-shadow:0 8px 24px rgba(0,0,0,0.4);">
-            <h2 style="margin-top:0;">🔐 Biometric Authentication Management</h2>
-            
-            <div style="margin-bottom:20px;padding:15px;background:#f0f8ff;border-left:4px solid #007bff;border-radius:4px;">
-                <p style="margin:0;font-size:0.95em;">Enroll or re-enroll your face for biometric authentication. This provides an additional security layer for superadmin access.</p>
+    <div id="biometric-management-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-card">
+            <h2>🔐 Face Biometric Management</h2>
+            <div class="modal-notice">
+                Enroll or re-enroll your face for biometric super admin authentication.
             </div>
-            
-            <div id="biometric-status" style="margin-bottom:20px;padding:15px;background:#f5f5f5;border-radius:4px;">
-                <p><strong>Current Status:</strong> <span id="biometric-status-text">Checking...</span></p>
-                <p id="biometric-last-updated" style="font-size:0.9em;color:#666;margin:5px 0 0 0;"></p>
+            <div class="modal-status-box">
+                <strong>Status:</strong> <span id="biometric-status-text">Checking…</span>
+                <p id="biometric-last-updated" class="modal-sub"></p>
             </div>
-            
-            <div style="margin-bottom:20px;">
-                <h3 style="margin-top:0;">Face Enrollment</h3>
-                <div id="face-enroll-container" style="background:#f9f9f9;padding:15px;border-radius:4px;border:2px solid #ddd;">
-                    <video id="face-enroll-video" style="width:100%;max-width:400px;border-radius:8px;border:2px solid #ddd;margin-bottom:8px;"></video>
-                    <canvas id="face-enroll-canvas" style="display:none;"></canvas>
-                    <div id="face-enroll-status" style="font-size:0.9em;color:#666;margin:8px 0;text-align:center;min-height:20px;">Ready to enroll</div>
-                    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
-                        <button type="button" id="start-enroll-btn" onclick="startBiometricEnrollment()" style="padding:10px 20px;background:#28a745;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:bold;">Start Enrollment</button>
-                        <button type="button" id="capture-face-btn" onclick="captureBiometricFace()" style="padding:10px 20px;background:#007bff;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:bold;display:none;">Capture & Enroll</button>
-                        <button type="button" onclick="stopBiometricEnrollment()" style="padding:10px 20px;background:#6c757d;color:white;border:none;border-radius:4px;cursor:pointer;">Cancel</button>
-                    </div>
+            <h3>Face Enrollment</h3>
+            <div class="face-enroll-box">
+                <video id="face-enroll-video" autoplay muted playsinline style="width:100%;max-width:400px;border-radius:8px;border:2px solid #ddd;margin-bottom:8px;"></video>
+                <canvas id="face-enroll-canvas" style="display:none;"></canvas>
+                <div id="face-enroll-status" class="face-status-msg">Ready to enroll</div>
+                <div class="auth-btn-col" style="margin-top:12px;">
+                    <button type="button" id="start-enroll-btn" class="auth-btn-green" onclick="startBiometricEnrollment()">▶ Start Enrollment</button>
+                    <button type="button" id="capture-face-btn" class="auth-btn-primary" onclick="captureBiometricFace()" style="display:none;">📸 Capture &amp; Enroll</button>
+                    <button type="button" class="auth-btn-secondary" onclick="stopBiometricEnrollment()">✕ Cancel</button>
                 </div>
             </div>
-            
-            <div style="display:flex;gap:8px;justify-content:flex-end;">
-                <button type="button" onclick="closeBiometricManagement()" style="padding:10px 20px;background:#6c757d;color:white;border:none;border-radius:4px;cursor:pointer;">Close</button>
+            <div style="display:flex;justify-content:flex-end;margin-top:20px;">
+                <button type="button" class="auth-btn-secondary" onclick="closeBiometricManagement()">Close</button>
             </div>
         </div>
     </div>
 
     <footer>
-        <p>&copy; 2023 Apisam Beekeeping. All rights reserved.</p>
+        <p>&copy; 2025 Apisam Beekeeping. All rights reserved.</p>
     </footer>
 </body>
 </html>

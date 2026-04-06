@@ -11,6 +11,12 @@ function loadNavbar() {
         .then(data => {
             navbarContainer.innerHTML = data;
             updateNavigation();
+            updateCartDisplay(); // refresh badge now that #cart-count exists in DOM
+            // Bind mobile menu toggle
+            const toggle = document.getElementById('mobile-toggle');
+            if (toggle) {
+                toggle.addEventListener('click', toggleMobileMenu);
+            }
         })
         .catch(err => {
             console.error('Error loading navbar:', err);
@@ -27,6 +33,13 @@ function loadNavbar() {
                 </nav>`;
             updateNavigation();
         });
+}
+
+function toggleMobileMenu() {
+    const links = document.querySelector('.navbar-links');
+    if (links) {
+        links.classList.toggle('mobile-open');
+    }
 }
 
 // Cart - now user-specific
@@ -53,12 +66,16 @@ function updateCartDisplay() {
     const cartTotal = document.getElementById('cart-total');
     const cartItemsPage = document.getElementById('cart-items-page');
     const cartTotalPage = document.getElementById('cart-total-page');
-    const cartCount = document.getElementById('cart-count');
+    const cartCount = document.getElementById('cart-count'); // inside navbar (loaded async)
     const sidebarItems = document.getElementById('sidebar-cart-items');
     const sidebarTotal = document.getElementById('sidebar-cart-total');
 
     let total = 0;
     let itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+    // Always update the badge — querySelector catches it even after navbar injection
+    const badge = document.getElementById('cart-count');
+    if (badge) badge.textContent = itemCount;
 
     const cartHTML = cart.map((item, i) => {
         const itemTotal = parseFloat(item.price || 0) * item.quantity;
@@ -103,7 +120,6 @@ function updateCartDisplay() {
     if (cartTotal) cartTotal.textContent = total.toLocaleString();
     if (cartTotalPage) cartTotalPage.textContent = total.toLocaleString();
     if (sidebarTotal) sidebarTotal.textContent = total.toLocaleString();
-    if (cartCount) cartCount.textContent = itemCount;
 
     saveCart();
     updateProductButtons();
@@ -142,20 +158,33 @@ function updateProductButtons() {
     document.querySelectorAll('.product').forEach(product => {
         const id = product.dataset.id;
         const cartItem = cart.find(i => i.id === id);
-        const button = product.querySelector('.add-to-cart');
-        
+        const button = product.querySelector('.add-to-cart, .quantity-button');
+
         if (cartItem && button) {
             button.innerHTML = `
                 <div class="quantity-controls">
-                    <button type="button" onclick="event.stopPropagation(); changeQuantityByProduct('${id}', -1)">-</button>
+                    <button type="button" data-action="dec" data-id="${id}">-</button>
                     <span>${cartItem.quantity}</span>
-                    <button type="button" onclick="event.stopPropagation(); changeQuantityByProduct('${id}', 1)">+</button>
+                    <button type="button" data-action="inc" data-id="${id}">+</button>
                 </div>
             `;
             button.className = 'quantity-button';
+            // bind the inner +/- buttons directly so clicks always register
+            button.querySelectorAll('button[data-action]').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const change = this.dataset.action === 'inc' ? 1 : -1;
+                    changeQuantityByProduct(this.dataset.id, change);
+                });
+            });
         } else if (button) {
             button.innerHTML = 'Add to Cart';
             button.className = 'add-to-cart';
+            // re-bind add-to-cart
+            button.onclick = function() {
+                const p = this.closest('.product');
+                if (p) addToCart(p.dataset.id, p.dataset.name, p.dataset.price);
+            };
         }
     });
 }
@@ -250,30 +279,29 @@ function escapeHtml(str) {
 }
 
 function updateNavigation() {
-    const navUl = document.querySelector('nav ul');
-    if (!navUl) return;
+    // Update avatar/login indicator
+    const avatarEl = document.getElementById('nav-avatar');
+    const avatarLabel = document.getElementById('nav-avatar-label');
+    const avatarLink = document.getElementById('nav-avatar-link');
 
-    // Clear existing auth links
-    const existingAuthLinks = navUl.querySelectorAll('li a[href="login.html"], li a[href="signup.html"], li a[href="profile.html"]');
-    existingAuthLinks.forEach(link => link.parentElement.remove());
-
-    // Add appropriate links based on auth state
-    if (currentUser) {
-        const profileLi = document.createElement('li');
-        profileLi.innerHTML = '<a href="profile.html">Profile</a>';
-        navUl.appendChild(profileLi);
-        
-        const logoutLi = document.createElement('li');
-        logoutLi.innerHTML = '<a href="#" onclick="logout()">Logout</a>';
-        navUl.appendChild(logoutLi);
-    } else {
-        const loginLi = document.createElement('li');
-        loginLi.innerHTML = '<a href="login.html">Login</a>';
-        navUl.appendChild(loginLi);
-
-        const signupLi = document.createElement('li');
-        signupLi.innerHTML = '<a href="signup.html">Sign Up</a>';
-        navUl.appendChild(signupLi);
+    if (avatarEl && avatarLabel && avatarLink) {
+        if (currentUser) {
+            // Show first initial in a green circle
+            const initial = (currentUser.name || currentUser.email || '?')[0].toUpperCase();
+            avatarEl.textContent = initial;
+            avatarEl.classList.add('logged-in');
+            avatarLabel.textContent = currentUser.name ? currentUser.name.split(' ')[0] : 'Profile';
+            avatarLink.href = 'profile.html';
+            avatarLink.title = `Logged in as ${currentUser.name || currentUser.email}`;
+            avatarLink.onclick = null;
+        } else {
+            avatarEl.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>';
+            avatarEl.classList.remove('logged-in');
+            avatarLabel.textContent = 'Login';
+            avatarLink.href = 'login.html';
+            avatarLink.title = 'Login';
+            avatarLink.onclick = null;
+        }
     }
 }
 
@@ -549,13 +577,16 @@ function createCartSidebar() {
     sidebar.className = 'cart-sidebar';
     sidebar.innerHTML = `
         <div class="sidebar-header">
-            <h3>Shopping Cart</h3>
+            <h3>🛒 Your Cart</h3>
             <button onclick="toggleCartSidebar()">&times;</button>
         </div>
         <div id="sidebar-cart-items"></div>
         <div class="sidebar-footer">
-            <div class="sidebar-total">Total: KSH <span id="sidebar-cart-total">0</span></div>
-            <button onclick="window.location.href='cart.html'">View Cart</button>
+            <div class="sidebar-total">
+                <span>Total</span>
+                <span>KSH <span id="sidebar-cart-total">0</span></span>
+            </div>
+            <button onclick="window.location.href='cart.html'">View Cart &amp; Checkout</button>
         </div>
     `;
     document.body.appendChild(sidebar);
@@ -647,16 +678,20 @@ function displayShopProducts(products) {
         const productsHTML = categoryProducts.map(product => {
             const minStock = product.min_stock_level || 5;
             const stockClass = product.stock_quantity <= minStock ? 'low-stock' : 'in-stock';
-            const originalPrice = product.original_price ? `<span style="text-decoration: line-through; color: #999;">KSH ${product.original_price.toLocaleString()}</span> ` : '';
-            const imageHTML = product.image_url ? `<img src="${product.image_url}" alt="${product.name}">` : '';
+            const originalPrice = product.original_price
+                ? `<span style="text-decoration:line-through;color:#bbb;font-size:0.85rem;font-weight:400;">KSH ${Number(product.original_price).toLocaleString()}</span> `
+                : '';
+            const imageHTML = product.image_url
+                ? `<img src="${product.image_url}" alt="${escapeHtml(product.name)}" loading="lazy">`
+                : `<div style="width:100%;height:180px;background:linear-gradient(135deg,#f8f9fa,#e9ecef);display:flex;align-items:center;justify-content:center;font-size:3rem;">🍯</div>`;
             
             return `
-                <div class="product" data-id="${product.id}" data-name="${product.name}" data-price="${product.price}">
+                <div class="product" data-id="${product.id}" data-name="${escapeHtml(product.name)}" data-price="${product.price}">
                     ${imageHTML}
-                    <h2>${product.name}</h2>
-                    <p>${product.description}</p>
-                    <p class="stock-info"><strong>Stock Info:</strong> <span class="${stockClass}">${product.stock_quantity || 0} available</span></p>
-                    <p class="price">${originalPrice}<strong>KSH ${product.price.toLocaleString()}</strong></p>
+                    <h2>${escapeHtml(product.name)}</h2>
+                    <p>${escapeHtml(product.description || '')}</p>
+                    <div class="stock-info"><span class="${stockClass}">${product.stock_quantity || 0} in stock</span></div>
+                    <p class="price">${originalPrice}${Number(product.price).toLocaleString()}</p>
                     <button class="add-to-cart">Add to Cart</button>
                 </div>
             `;
@@ -672,13 +707,10 @@ function displayShopProducts(products) {
     
     document.getElementById('shop-products').innerHTML = shopHTML;
     
-    // Bind add-to-cart buttons
     document.querySelectorAll('.add-to-cart').forEach(btn => {
         btn.addEventListener('click', function() {
             const product = this.closest('.product');
-            if (product) {
-                addToCart(product.dataset.id, product.dataset.name, product.dataset.price);
-            }
+            if (product) addToCart(product.dataset.id, product.dataset.name, product.dataset.price);
         });
     });
     
@@ -1929,11 +1961,11 @@ let faceScanActive = false;
 async function loadFaceDetectionModels() {
     if (faceDetectionModelsLoaded) return;
     try {
-        const modelsUrl = 'https://cdn.jsdelivr.net/npm/@tensorflow-models/face-api@0.0.7/dist/models/';
+        const modelsUrl = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights';
         await Promise.all([
-            faceApi.nets.tinyFaceDetector.loadFromUri(modelsUrl),
-            faceApi.nets.faceLandmark68Net.loadFromUri(modelsUrl),
-            faceApi.nets.faceRecognitionNet.loadFromUri(modelsUrl)
+            faceapi.nets.tinyFaceDetector.loadFromUri(modelsUrl),
+            faceapi.nets.faceLandmark68Net.loadFromUri(modelsUrl),
+            faceapi.nets.faceRecognitionNet.loadFromUri(modelsUrl)
         ]);
         faceDetectionModelsLoaded = true;
         console.log('Face detection models loaded successfully');
@@ -2044,7 +2076,7 @@ async function detectFaceContinuously(video) {
     if (!faceDetectionModelsLoaded || !faceScanActive) return;
     
     try {
-        const detections = await faceApi.detectAllFaces(video).withFaceLandmarks().withFaceDescriptors();
+        const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptors();
         
         // Display detection status
         if (detections.length === 0) {
@@ -2536,7 +2568,7 @@ async function detectProfileVerifyFaceContinuously(video) {
     if (!faceDetectionModelsLoaded || !profileVerifyScanActive) return;
     
     try {
-        const detections = await faceApi.detectAllFaces(video).withFaceLandmarks().withFaceDescriptors();
+        const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptors();
         
         if (detections.length === 0) {
             if (statusEl) statusEl.textContent = '⚠️ No face detected - Position your face in view';
@@ -2726,7 +2758,7 @@ async function detectProfileFaceContinuously(video) {
     if (!faceDetectionModelsLoaded || !profileFaceScanActive) return;
     
     try {
-        const detections = await faceApi.detectAllFaces(video).withFaceLandmarks().withFaceDescriptors();
+        const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptors();
         
         if (detections.length === 0) {
             if (statusEl) statusEl.textContent = '⚠️ No face detected - Position your face in view';
@@ -2736,13 +2768,10 @@ async function detectProfileFaceContinuously(video) {
             
             const { detection: box } = detection;
             const videoWidth = video.videoWidth;
-            const videoHeight = video.videoHeight;
             const faceWidth = box.width;
             const centerX = box.x + faceWidth / 2;
             const centerY = box.y + box.height / 2;
-            const expectedCenterX = videoWidth / 2;
-            const expectedCenterY = videoHeight / 2;
-            const centerDistance = Math.sqrt(Math.pow(centerX - expectedCenterX, 2) + Math.pow(centerY - expectedCenterY, 2));
+            const centerDistance = Math.sqrt(Math.pow(centerX - video.videoWidth / 2, 2) + Math.pow(centerY - video.videoHeight / 2, 2));
             
             if (centerDistance < 50 && faceWidth > videoWidth * 0.4) {
                 if (statusEl) statusEl.textContent = '✓ Face detected and well-positioned - Ready to capture!';

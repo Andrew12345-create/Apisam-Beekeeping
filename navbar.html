@@ -1,13 +1,29 @@
 <div class="navbar">
     <a class="navbar-brand" href="index.html">
         <img src="logo.png" alt="Apisam">
-        <span>Apisam</span>
+        <span>Apisam Beekeeping</span>
     </a>
+    <button id="mobile-toggle">☰</button>
     <ul class="navbar-links">
         <li><a href="index.html">Home</a></li>
         <li><a href="shop.html">Shop</a></li>
         <li><a href="about.html">About</a></li>
         <li><a href="contact.html">Contact</a></li>
-        <li><a href="cart.html" class="nav-cart">🛒 <span id="cart-count">0</span></a></li>
+        <li>
+            <a href="cart.html" class="nav-cart">
+                <span class="cart-icon">🛒</span>
+                <span id="cart-count" class="cart-badge">0</span>
+            </a>
+        </li>
+        <li id="nav-auth-item">
+            <a href="login.html" class="nav-avatar-link" id="nav-avatar-link">
+                <div class="nav-avatar" id="nav-avatar">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                        <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
+                    </svg>
+                </div>
+                <span class="nav-avatar-label" id="nav-avatar-label">Login</span>
+            </a>
+        </li>
     </ul>
 </div>
