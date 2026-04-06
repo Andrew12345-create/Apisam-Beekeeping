@@ -15,7 +15,7 @@ if (!process.env.DATABASE_URL) {
   process.exit(1);
 }
 
-const isProduction = process.env.NODE_ENV === 'production' || process.env.URL;
+const isProduction = process.env.NODE_ENV === 'production' || process.env.NETLIFY || process.env.CONTEXT;
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -1144,6 +1144,26 @@ app.get('/api/products/full', async (req, res) => {
 
 app.get('/api/test', (req, res) => {
   res.json({ message: 'Server is running', timestamp: new Date() });
+});
+
+app.get('/api/products', async (req, res) => {
+  const clientIP = req.ip || req.connection.remoteAddress;
+  const startTime = performance.now();
+  const timestamp = new Date().toISOString();
+  
+  console.log(`[${timestamp}] GET /api/products from IP ${clientIP} - Query started`);
+  
+  try {
+    const result = await pool.query('SELECT id, name, price, description, image, category, stock FROM products ORDER BY category, name');
+    const duration = performance.now() - startTime;
+    console.log(`[${timestamp}] GET /api/products from IP ${clientIP} - Query completed in ${duration.toFixed(2)}ms - Found ${result.rows.length} products`);
+    
+    res.json({ products: result.rows });
+  } catch (err) {
+    const duration = performance.now() - startTime;
+    console.error(`[${timestamp}] GET /api/products from IP ${clientIP} - ERROR after ${duration.toFixed(2)}ms:`, err.message);
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
 app.get('/api/admin/products', async (req, res) => {
