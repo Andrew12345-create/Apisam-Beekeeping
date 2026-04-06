@@ -256,15 +256,19 @@ function isTokenExpired(token) {
 
 const API_PORT = 3000;
 let API_BASE = '';
-// If the page is opened via file:// or there's no port, point API requests at localhost:3000
-if (location.protocol === 'file:' || !location.port) {
+// file:// protocol → point at localhost:3000
+// Same-origin server (port 80/443 or any non-3000 public port) → use relative URLs (empty string)
+// Explicit localhost dev on a different port → point at localhost:3000
+if (location.protocol === 'file:') {
     API_BASE = `http://localhost:${API_PORT}`;
-} else if (String(location.port) !== String(API_PORT)) {
-    API_BASE = `${location.protocol}//${location.hostname}:${API_PORT}`;
+} else if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+    // Local dev: if already on port 3000 use relative, otherwise point at 3000
+    API_BASE = String(location.port) === String(API_PORT) ? '' : `http://localhost:${API_PORT}`;
 } else {
+    // Public server — use same origin (relative URLs)
     API_BASE = '';
 }
-console.log('apiUrl base:', API_BASE);
+console.log('apiUrl base:', API_BASE || '(same origin)');
 function apiUrl(path) { return API_BASE + path; }
 
 // Utility to escape HTML for safe insertion
@@ -477,7 +481,7 @@ async function login(email, password) {
         if (u) { currentUser = u; localStorage.setItem('currentUser', JSON.stringify(currentUser)); return true; }
         const msgEl = document.getElementById('login-message');
         if (msgEl) {
-            msgEl.textContent = 'Unable to connect to server. Please ensure the server is running by executing "npm start" in the project directory.';
+            msgEl.textContent = 'Unable to connect. Please check your connection and try again.';
             msgEl.style.color = 'red';
         }
         console.error('Login error:', err);
