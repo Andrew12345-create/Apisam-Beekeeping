@@ -37,7 +37,6 @@ pool.connect((err, client, release) => {
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname)));
 
 // Error handling middleware for JSON parsing
 app.use((err, req, res, next) => {
@@ -1258,6 +1257,16 @@ app.post('/api/mpesa/callback', (req, res) => {
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
+});
+
+// Serve static files AFTER all API routes so /api/* is never intercepted
+app.use(express.static(path.join(__dirname)));
+
+// Catch-all: serve index.html for any non-API route (client-side navigation)
+app.get('*', (req, res) => {
+  if (!req.path.startsWith('/api')) {
+    res.sendFile(path.join(__dirname, 'index.html'));
+  }
 });
 // Additional security endpoints
 app.post('/api/admin/revoke-session', authenticateToken, async (req, res) => {
