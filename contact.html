@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Apisam Beekeeping - Contact</title>
+    <title>Apisam Beekeeping - Contact Us</title>
     <link rel="stylesheet" href="style.css">
     <script src="script.js" defer></script>
 </head>
@@ -13,45 +13,112 @@
     </header>
 
     <main>
-        <section class="contact">
-            <h1>Contact Us</h1>
-            <div class="contact-content">
-                <div class="contact-form">
-                    <h2>Send us a message</h2>
-                    <form id="contact-form">
-                        <div class="form-group">
-                            <label for="name">Name:</label>
-                            <input type="text" id="name" name="name" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="email">Email:</label>
-                            <input type="email" id="email" name="email" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="subject">Subject:</label>
-                            <input type="text" id="subject" name="subject" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="message">Message:</label>
-                            <textarea id="message" name="message" rows="5" required></textarea>
-                        </div>
-                        <button type="submit">Send Message</button>
-                    </form>
-                    <div id="contact-message"></div>
+        <section class="hero">
+            <div class="hero-content">
+                <div class="hero-badge">📞 Get In Touch</div>
+                <h1>Contact Apisam<br>Beekeeping</h1>
+                <p>Have questions about our products? Need advice on beekeeping equipment? Our team is here to help you succeed.</p>
+                <div class="hero-actions">
+                    <a href="about.html" class="btn-secondary">About Us</a>
                 </div>
-                <div class="contact-info">
-                    <h2>Get in Touch</h2>
-                    <p><strong>Address:</strong> 123 Bee Lane, Honeyville, CA 90210</p>
-                    <p><strong>Phone:</strong> (555) 123-BEES</p>
-                    <p><strong>Email:</strong> info@apisambeekeeping.com</p>
-                    <p><strong>Hours:</strong> Mon-Fri 9AM-6PM, Sat 10AM-4PM</p>
+            </div>
+            <div class="hero-visual">
+                <div class="hero-honeycomb">
+                    <span>📧</span>
                 </div>
+            </div>
+        </section>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
+            <div class="auth" style="max-width: 100%; margin: 0;">
+                <h1 style="color: #2c3e50; margin-bottom: 1.5rem;">Send us a Message</h1>
+                <form id="contact-form" class="auth-form">
+                    <div class="form-group">
+                        <label for="name">Your Name</label>
+                        <input type="text" id="name" name="name" placeholder="Enter your name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Email Address</label>
+                        <input type="email" id="email" name="email" placeholder="Enter your email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="subject">Subject</label>
+                        <input type="text" id="subject" name="subject" placeholder="What is this about?" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="message">Your Message</label>
+                        <textarea id="message" name="message" rows="5" placeholder="How can we help you?" required></textarea>
+                    </div>
+                    <button type="submit" style="width: 100%;">Send Message</button>
+                </form>
+                <div id="contact-message"></div>
+            </div>
+
+            <div class="about-strip" style="margin: 0; display: flex; flex-direction: column; justify-content: center;">
+                <h2 style="color: #2c3e50; margin-bottom: 1.5rem;">Contact Information</h2>
+                <div style="margin-bottom: 1.5rem;">
+                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                        <span style="font-size: 1.5rem;">📍</span>
+                        <div>
+                            <strong style="color: #2c3e50;">Address</strong>
+                            <p style="color: #555; margin: 0;">Nairobi, Kenya</p>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                        <span style="font-size: 1.5rem;">📱</span>
+                        <div>
+                            <strong style="color: #2c3e50;">Phone</strong>
+                            <p style="color: #555; margin: 0;">+254 700 000 000</p>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                        <span style="font-size: 1.5rem;">✉️</span>
+                        <div>
+                            <strong style="color: #2c3e50;">Email</strong>
+                            <p style="color: #555; margin: 0;">info@apisambeekeeping.com</p>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                        <span style="font-size: 1.5rem;">🕐</span>
+                        <div>
+                            <strong style="color: #2c3e50;">Business Hours</strong>
+                            <p style="color: #555; margin: 0;">Mon - Fri: 8AM - 6PM<br>Sat: 9AM - 4PM</p>
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-top: 1rem; padding-top: 1.5rem; border-top: 1px solid rgba(243,156,18,0.2);">
+                    <strong style="color: #2c3e50;">Follow Us</strong>
+                    <p style="color: #555;">🐝 Stay connected for tips, updates, and beekeeping news!</p>
+                </div>
+            </div>
+        </div>
+
+        <section class="features" style="margin-top: 2rem;">
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3>Quick Response</h3>
+                <p>We respond to all inquiries within 24 hours.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">💰</div>
+                <h3>Bulk Orders</h3>
+                <p>Special pricing for commercial and institutional buyers.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🎓</div>
+                <h3>Technical Support</h3>
+                <p>Expert advice on equipment selection and beekeeping.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔒</div>
+                <h3>Secure Payments</h3>
+                <p>Safe transactions via M-Pesa, cards, and bank transfers.</p>
             </div>
         </section>
     </main>
 
     <footer>
-        <p>&copy; 2023 Apisam Beekeeping. All rights reserved.</p>
+        <p>&copy; 2025 Apisam Beekeeping. All rights reserved.</p>
     </footer>
 </body>
 </html>
