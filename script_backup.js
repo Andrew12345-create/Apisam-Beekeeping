@@ -1786,7 +1786,7 @@ let timerInterval;
 
 function setAdminSession() {
     console.log('Setting admin session');
-    const expiry = Date.now() + (10 * 60 * 1000); // 10 minutes
+    const expiry = Date.now() + (30 * 1000); // 30 seconds
     localStorage.setItem('adminSession', expiry.toString());
     console.log('Session set, starting timer');
     startTimer();

@@ -68,8 +68,8 @@ const SUPER_ADMIN_LOCKOUT_TIME = 24 * 60 * 60 * 1000; // 24 hours - increased fo
 
 // Admin session tracking
 const adminSessions = new Map();
-const ADMIN_SESSION_TIMEOUT = 10 * 60 * 1000; // 10 minutes
-const SUPER_ADMIN_SESSION_TIMEOUT = 2 * 60 * 1000; // 2 minutes for super admin - reduced for security
+const ADMIN_SESSION_TIMEOUT = 30 * 1000; // 30 seconds
+const SUPER_ADMIN_SESSION_TIMEOUT = 30 * 1000; // 30 seconds
 
 // Password verification attempts
 const passwordVerificationAttempts = new Map();
@@ -557,7 +557,7 @@ app.post('/api/admin/authenticate', async (req, res) => {
       message: 'Admin authenticated successfully',
       sessionId,
       isSuperAdmin: user.is_super_admin,
-      sessionTimeout: user.is_super_admin ? 5 : 10 // minutes
+      sessionTimeout: 30 // seconds
     });
   } catch (err) {
     console.error('Admin auth error:', err);

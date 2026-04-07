@@ -256,22 +256,19 @@ function isTokenExpired(token) {
 
 const API_PORT = 3000;
 let API_BASE = '';
-// Ensure API_BASE is set correctly for public servers
+const PUBLIC_API_URL = 'https://apisambeekeeping.netlify.app';
 if (!API_BASE && location.protocol !== 'file:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-    API_BASE = `${location.protocol}//${location.hostname}${location.port ? ':' + location.port : ''}`;
+    API_BASE = PUBLIC_API_URL;
     console.log('Public server detected, API_BASE set to:', API_BASE);
 }
 // file:// protocol → point at localhost:3000
-// Same-origin server (port 80/443 or any non-3000 public port) → use relative URLs (empty string)
 // Explicit localhost dev on a different port → point at localhost:3000
+// Public server → keep the API_BASE set above (same origin)
 if (location.protocol === 'file:') {
     API_BASE = `http://localhost:${API_PORT}`;
 } else if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-    // Local dev: if already on port 3000 use relative, otherwise point at 3000
+    // Local dev: if already on port 3000 use relative, otherwise point at localhost:3000
     API_BASE = String(location.port) === String(API_PORT) ? '' : `http://localhost:${API_PORT}`;
-} else {
-    // Public server — use same origin (relative URLs)
-    API_BASE = '';
 }
 console.log('apiUrl base:', API_BASE || '(same origin)');
 function apiUrl(path) { return API_BASE + path; }
@@ -1852,7 +1849,7 @@ let timerInterval;
 
 function setAdminSession() {
     console.log('Setting admin session');
-    const expiry = Date.now() + (10 * 60 * 1000); // 10 minutes
+    const expiry = Date.now() + (30 * 1000); // 30 seconds
     localStorage.setItem('adminSession', expiry.toString());
     console.log('Session set, starting timer');
     startTimer();
