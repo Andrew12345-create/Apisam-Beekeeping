@@ -1,0 +1,8 @@
+{
+  "name": "apisam-frontend",
+  "version": "1.0.0",
+  "description": "Apisam Beekeeping Frontend",
+  "scripts": {
+    "start": "npx serve"
+  }
+}

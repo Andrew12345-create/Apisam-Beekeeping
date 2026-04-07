@@ -255,22 +255,16 @@ function isTokenExpired(token) {
 }
 
 const API_PORT = 3000;
-let API_BASE = '';
-const PUBLIC_API_URL = 'https://apisambeekeeping.netlify.app';
-if (!API_BASE && location.protocol !== 'file:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-    API_BASE = PUBLIC_API_URL;
-    console.log('Public server detected, API_BASE set to:', API_BASE);
-}
-// file:// protocol → point at localhost:3000
-// Explicit localhost dev on a different port → point at localhost:3000
-// Public server → keep the API_BASE set above (same origin)
-if (location.protocol === 'file:') {
+const PUBLIC_BACKEND_URL = 'https://apisambeekeeping.netlify.app';
+let API_BASE;
+
+const hostname = location.hostname;
+if (hostname === 'localhost' || hostname === '127.0.0.1') {
     API_BASE = `http://localhost:${API_PORT}`;
-} else if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-    // Local dev: if already on port 3000 use relative, otherwise point at localhost:3000
-    API_BASE = String(location.port) === String(API_PORT) ? '' : `http://localhost:${API_PORT}`;
+} else {
+    API_BASE = PUBLIC_BACKEND_URL;
 }
-console.log('apiUrl base:', API_BASE || '(same origin)');
+console.log('API_BASE set to:', API_BASE);
 function apiUrl(path) { return API_BASE + path; }
 
 // Utility to escape HTML for safe insertion
